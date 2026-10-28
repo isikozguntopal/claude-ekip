@@ -47,6 +47,7 @@
       </select>
     </label>
     <span id="state" class="chip chip-off">Oturum yok</span>
+    <button id="pvToggle" class="btn" title="Tarayıcı ve iOS Simulator önizlemesi">Önizleme</button>
     <button id="newSession" class="btn">Yeni oturum</button>
   </header>
 
@@ -76,6 +77,31 @@
         </div>
       </div>
     </section>
+        <aside class="panel preview">
+          <div class="panel-head">
+            <div class="pv-tabs">
+              <button class="pv-tab active" data-pv="web">Tarayıcı</button>
+              <button class="pv-tab" data-pv="sim">iOS Simulator</button>
+            </div>
+          </div>
+          <div id="pvWeb" class="pv-body">
+            <form id="urlForm" class="pv-bar">
+              <input id="urlInput" value="http://localhost:8888" spellcheck="false" />
+              <button class="btn btn-small" type="submit">Git</button>
+            </form>
+            <webview id="webview" class="pv-frame" src="about:blank"></webview>
+          </div>
+          <div id="pvSim" class="pv-body hidden">
+            <div class="pv-bar">
+              <select id="simDevice"></select>
+              <button id="simBoot" class="btn btn-small">Aç</button>
+            </div>
+            <div class="pv-frame sim-screen">
+              <img id="simShot" alt="" class="hidden" />
+              <p id="simMsg" class="pv-msg">Bir simülatör seçip Aç'a basın.</p>
+            </div>
+          </div>
+        </aside>
   </main>
 
   <div id="modal" class="modal hidden"><div class="modal-box" id="modalBox"></div></div>
@@ -83,6 +109,7 @@
 
   <script src="../team.js"></script>
   <script src="markdown.js"></script>
+  <script src="preview.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

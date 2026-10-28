@@ -36,6 +36,7 @@ canvas { image-rendering: pixelated; }
   padding: 10px 16px;
   background: #1d1828;
   border-bottom: 3px solid var(--line);
+  flex-wrap: wrap; row-gap: 8px;
 }
 .brand { white-space: nowrap; display: flex; align-items: center; gap: 10px; font: 700 15px var(--mono); letter-spacing: 3px; color: var(--accent); }
 .spacer { flex: 1; }
@@ -260,3 +261,22 @@ main { flex: 1; display: grid; grid-template-columns: minmax(460px, 40%) minmax(
 ::-webkit-scrollbar { width: 10px; height: 10px; }
 ::-webkit-scrollbar-thumb { background: var(--line-2); }
 ::-webkit-scrollbar-track { background: transparent; }
+
+/* ---------- Önizleme (tarayıcı + iOS Simulator) ---------- */
+.preview { display: none; min-width: 0; min-height: 0; flex-direction: column; }
+main.pv-open { grid-template-columns: minmax(380px, 30%) minmax(0, 1fr) minmax(400px, 36%); }
+main.pv-open .preview { display: flex; }
+.pv-tabs { display: flex; gap: 6px; }
+.pv-tab { background: none; border: 2px solid transparent; color: var(--muted); font: 700 12px var(--mono); letter-spacing: 2px; padding: 3px 8px; cursor: pointer; }
+.pv-tab.active { color: var(--text); border-color: var(--line-2); background: var(--panel-2); }
+.pv-body { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+.pv-bar { display: flex; gap: 8px; padding: 8px 10px; border-bottom: 2px solid var(--line); }
+.pv-bar input, .pv-bar select { flex: 1; min-width: 0; background: var(--bg); color: var(--text); border: 2px solid var(--line); padding: 4px 8px; font: 13px var(--mono); }
+.pv-frame { flex: 1; min-height: 0; width: 100%; border: 0; background: #000; }
+.sim-screen { display: flex; align-items: center; justify-content: center; overflow: hidden; }
+.sim-screen img { max-width: 100%; max-height: 100%; object-fit: contain; }
+.pv-msg { margin: 0; color: var(--faint); font-size: 13px; }
+/* Ofis: önizleme açıkken sıkışır, görseller küçülür */
+main.pv-open .office { transform: scale(.8); transform-origin: top left; }
+.left > .office-panel { flex: 1 1 0; min-height: 0; overflow: hidden; display: flex; flex-direction: column; }
+.left > .detail { flex: 1 1 0; min-height: 0; }

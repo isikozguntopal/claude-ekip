@@ -3,7 +3,7 @@ const { app, BrowserWindow, ipcMain, dialog, shell, nativeImage } = require('ele
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
-const { spawn } = require('child_process');
+const { spawn, execFile } = require('child_process');
 const { TEAM } = require('./team.js');
 
 let win = null;
@@ -23,6 +23,21 @@ function saveSettings(patch) {
   fs.mkdirSync(path.dirname(settingsFile()), { recursive: true });
   fs.writeFileSync(settingsFile(), JSON.stringify(s, null, 2));
   return s;
+}
+
+// ---------- Sohbet geçmişi ----------
+// Her satır: { ws, item } — item ya { kind: "user", text } ya { kind: "event", msg } (SDK mesajı).
+const chatFile = () => path.join(app.getPath('userData'), 'chat-log.jsonl');
+function readChatLines() {
+  try {
+    return fs.readFileSync(chatFile(), 'utf8').split('\n').filter(Boolean).map((l) => { try { return JSON.parse(l); } catch { return null; } }).filter(Boolean);
+  } catch { return []; }
+}
+function logChat(ws, item) {
+  try { fs.appendFileSync(chatFile(), JSON.stringify({ ws, item }) + '\n'); } catch (e) { console.error('Sohbet kaydedilemedi:', e.message); }
+}
+function clearChatLog(ws) {
+  try { fs.writeFileSync(chatFile(), readChatLines().filter((l) => l.ws !== ws).map((l) => JSON.stringify(l) + '\n').join('')); } catch { /* yoksay */ }
 }
 
 // ---------- claude.exe bulma ----------
@@ -68,8 +83,9 @@ function findClaudeUnix() {
       const direct = path.join(vdir, 'claude');
       if (fs.existsSync(direct)) return direct;
       for (const h of fs.readdirSync(vdir)) {
-        const p = path.join(vdir, h, 'claude');
-        if (fs.existsSync(p)) return p;
+        // Yeni sürümler: <sürüm>/<hash>/claude.app/Contents/MacOS/claude
+        for (const p of [path.join(vdir, h, 'claude'), path.join(vdir, h, 'claude.app', 'Contents', 'MacOS', 'claude')])
+          if (fs.existsSync(p) && fs.statSync(p).isFile()) return p;
       }
     }
   } catch { /* yoksa aşağı düş */ }
@@ -151,8 +167,9 @@ class InputQueue {
 }
 
 class AgentSession {
-  constructor(ws, mode, model) {
+  constructor(ws, mode, model, resume) {
     this.ws = ws;
+    this.resume = resume;
     this.mode = mode;
     this.model = model;
     this.queue = new InputQueue();
@@ -169,6 +186,7 @@ class AgentSession {
     const exe = findClaudeExe();
     if (!exe) throw new Error('claude.exe bulunamadı. Ayarlardan yolunu seçin.');
     const { query } = await loadSdk();
+    const previewMcp = await previewServer();
     this.q = query({
       prompt: this.queue,
       options: {
@@ -176,9 +194,11 @@ class AgentSession {
         pathToClaudeCodeExecutable: exe,
         settingSources: ['user', 'project', 'local'],
         model: this.model,
+        resume: this.resume || undefined,
         permissionMode: this.mode,
         allowDangerouslySkipPermissions: this.mode === 'bypassPermissions',
         includeHookEvents: true,
+        mcpServers: { 'ekip-preview': previewMcp },
         abortController: this.abort,
         env: childEnv(),
         canUseTool: (toolName, input, opts) => this.askPermission(toolName, input, opts),
@@ -208,8 +228,12 @@ class AgentSession {
   async pump() {
     try {
       for await (const msg of this.q) {
-        if (msg.session_id) this.sessionId = msg.session_id;
+        if (msg.session_id && msg.session_id !== this.sessionId) {
+          this.sessionId = msg.session_id;
+          saveSettings({ sessionId: msg.session_id, sessionWs: this.ws });
+        }
         if (msg.type === 'result') { this.busy = false; send('agent:state', { state: 'bosta' }); }
+        logChat(this.ws, { kind: 'event', msg });
         send('agent:event', msg);
       }
     } catch (e) {
@@ -223,6 +247,7 @@ class AgentSession {
 
   sendUser(text) {
     this.busy = true;
+    logChat(this.ws, { kind: 'user', text });
     send('agent:state', { state: 'calisiyor' });
     this.queue.push({
       type: 'user',
@@ -337,7 +362,9 @@ async function ensureSession() {
   if (starting) return starting;
   const s = loadSettings();
   if (!s.workspace) throw new Error('Önce bir workspace seçin.');
-  const sess = new AgentSession(s.workspace, s.permissionMode || 'default', s.model || DEFAULT_MODEL);
+  // Önceki sohbet aynı workspace'teyse Claude'un oturumunu devam ettir.
+  const resume = s.sessionWs === s.workspace ? s.sessionId : undefined;
+  const sess = new AgentSession(s.workspace, s.permissionMode || 'default', s.model || DEFAULT_MODEL, resume);
   starting = sess.start().then(() => { session = sess; return sess; }).finally(() => { starting = null; });
   return starting;
 }
@@ -359,7 +386,16 @@ ipcMain.handle('usage:get', async () => {
   } catch { return null; }
 });
 ipcMain.handle('agent:interrupt', () => session && session.interrupt());
-ipcMain.handle('agent:reset', () => resetSession());
+ipcMain.handle('agent:reset', () => {
+  resetSession();
+  const ws = loadSettings().workspace;
+  if (ws) clearChatLog(ws);
+  saveSettings({ sessionId: null, sessionWs: null });
+});
+ipcMain.handle('chat:history', () => {
+  const ws = loadSettings().workspace;
+  return readChatLines().filter((l) => l.ws === ws).slice(-400).map((l) => l.item);
+});
 ipcMain.handle('agent:mode', (_e, mode) => {
   saveSettings({ permissionMode: mode });
   if (session && session.alive) return session.setMode(mode);
@@ -380,6 +416,15 @@ ipcMain.handle('auth:login', () => {
   if (!exe) return false;
   resetSession();
   // Yeni bir konsol penceresinde tarayıcı tabanlı giriş akışı; kullanıcı kendisi tamamlar.
+  if (process.platform !== 'win32') {
+    // Mac: profil ortamıyla giriş komutunu çalıştıran bir .command betiğini Terminal'de aç.
+    fs.mkdirSync(PROFILE_DIR, { recursive: true });
+    const script = path.join(PROFILE_DIR, 'giris.command');
+    const q = s => `'${String(s).replace(/'/g, `'\\''`)}'`;
+    fs.writeFileSync(script, `#!/bin/sh\nexport CLAUDE_CONFIG_DIR=${q(PROFILE_DIR)}\n${q(exe)} auth login --claudeai\necho\necho "Giriş tamamlandı, bu pencereyi kapatabilirsiniz."\n`, { mode: 0o755 });
+    spawn('open', ['-a', 'Terminal', script], { detached: true, stdio: 'ignore' }).unref();
+    return true;
+  }
   const p = spawn(process.env.ComSpec || 'cmd.exe', ['/d', '/c', `start "Claude Ekip - Giris" "${exe}" auth login --claudeai`], {
     env: childEnv(), cwd: PROFILE_DIR, detached: true, stdio: 'ignore', windowsVerbatimArguments: true
   });
@@ -409,6 +454,106 @@ ipcMain.on('app:set-icon', (_e, dataUrl) => {
   try { if (win) win.setIcon(nativeImage.createFromDataURL(dataUrl)); } catch { /* yoksay */ }
 });
 
+// ---------- iOS Simulator (xcrun simctl) ----------
+const UDID_RE = /^[0-9A-F-]{36}$/i;
+function simctl(args) {
+  return new Promise((resolve, reject) => {
+    execFile('xcrun', ['simctl', ...args], { maxBuffer: 64 * 1024 * 1024, encoding: 'buffer' }, (err, stdout, stderr) => {
+      if (err) reject(new Error(String(stderr || err.message).trim()));
+      else resolve(stdout);
+    });
+  });
+}
+
+ipcMain.handle('sim:list', async () => {
+  const data = JSON.parse((await simctl(['list', 'devices', 'available', '-j'])).toString());
+  const devices = [];
+  for (const [runtime, list] of Object.entries(data.devices)) {
+    if (!/iOS/.test(runtime)) continue;
+    const version = runtime.replace(/^.*iOS-/, '').replace(/-/g, '.');
+    for (const d of list) if (/iPhone/.test(d.name)) devices.push({ udid: d.udid, name: `${d.name} · iOS ${version}`, booted: d.state === 'Booted' });
+  }
+  return devices;
+});
+
+ipcMain.handle('sim:boot', async (_e, udid) => {
+  if (!UDID_RE.test(udid)) throw new Error('Geçersiz simülatör');
+  await simctl(['boot', udid]).catch((e) => { if (!/current state: Booted/.test(e.message)) throw e; });
+  execFile('open', ['-a', 'Simulator']);
+  return true;
+});
+
+ipcMain.handle('sim:shot', async (_e, udid) => {
+  if (!UDID_RE.test(udid)) throw new Error('Geçersiz simülatör');
+  const file = path.join(os.tmpdir(), `ekip-sim-${process.pid}.png`);
+  await simctl(['io', udid, 'screenshot', '--type=png', file]);
+  return 'data:image/png;base64,' + fs.readFileSync(file).toString('base64');
+});
+
+// ---------- Ajan önizleme araçları (simülatör + tarayıcı) ----------
+const IDB = [path.join(os.homedir(), '.local/share/ekip-idb-venv/bin/idb'), '/opt/homebrew/bin/idb'].find((p) => fs.existsSync(p)) || 'idb';
+function idb(args) {
+  return new Promise((resolve, reject) => {
+    execFile(IDB, args, { maxBuffer: 16 * 1024 * 1024 }, (err, stdout, stderr) => {
+      if (err) reject(new Error(String(stderr || err.message).trim()));
+      else resolve(String(stdout));
+    });
+  });
+}
+async function bootedUdid() {
+  const data = JSON.parse((await simctl(['list', 'devices', 'booted', '-j'])).toString());
+  const d = Object.values(data.devices).flat().find((x) => x.state === 'Booted');
+  if (!d) throw new Error('Açık bir iOS simülatörü yok. Önce simülatörü açın.');
+  return d.udid;
+}
+
+let previewServerPromise = null;
+function previewServer() {
+  return (previewServerPromise ||= loadSdk().then(({ createSdkMcpServer, tool }) => {
+    const { z } = require('zod');
+    const text = (t) => ({ content: [{ type: 'text', text: t }] });
+    const run = (fn) => async (args) => {
+      try { return await fn(args); } catch (e) { return { content: [{ type: 'text', text: 'Hata: ' + e.message }], isError: true }; }
+    };
+    return createSdkMcpServer({
+      name: 'ekip-preview',
+      version: '1.0.0',
+      tools: [
+        tool('sim_screenshot', 'Açık iOS simülatörünün ekran görüntüsünü alır.', {}, run(async () => {
+          const udid = await bootedUdid();
+          const file = path.join(os.tmpdir(), `ekip-agent-${Date.now()}.png`);
+          await simctl(['io', udid, 'screenshot', '--type=png', file]);
+          return { content: [{ type: 'image', data: fs.readFileSync(file).toString('base64'), mimeType: 'image/png' }] };
+        })),
+        tool('sim_describe', 'Ekrandaki öğeleri erişilebilirlik ağacı olarak verir. Dokunmadan önce hedef koordinatları bulmak için kullanın.', {}, run(async () => {
+          const udid = await bootedUdid();
+          return text((await idb(['ui', 'describe-all', '--udid', udid])).slice(0, 12000));
+        })),
+        tool('sim_tap', 'Simülatörde verilen noktaya dokunur (393x852 nokta, sol üst 0,0).', { x: z.number(), y: z.number() }, run(async ({ x, y }) => {
+          const udid = await bootedUdid();
+          await idb(['ui', 'tap', String(x), String(y), '--udid', udid]);
+          return text(`Dokunuldu: ${x},${y}`);
+        })),
+        tool('sim_swipe', 'Simülatörde bir noktadan diğerine kaydırır.', { x1: z.number(), y1: z.number(), x2: z.number(), y2: z.number() }, run(async (a) => {
+          const udid = await bootedUdid();
+          await idb(['ui', 'swipe', String(a.x1), String(a.y1), String(a.x2), String(a.y2), '--udid', udid]);
+          return text('Kaydırıldı');
+        })),
+        tool('sim_type', 'Simülatörde aktif metin alanına yazı yazar.', { text: z.string() }, run(async ({ text: t }) => {
+          const udid = await bootedUdid();
+          await idb(['ui', 'text', t, '--udid', udid]);
+          return text('Yazıldı');
+        })),
+        tool('preview_open', 'Önizleme panelinin tarayıcı sekmesinde verilen localhost adresini açar (ör. http://localhost:8888).', { url: z.string() }, run(async ({ url }) => {
+          if (!/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?(\/|$)/.test(url)) throw new Error('Yalnızca localhost adresleri açılabilir.');
+          if (win && !win.isDestroyed()) win.webContents.send('preview:open', { url });
+          return text('Önizleme açıldı: ' + url);
+        })),
+      ],
+    });
+  }));
+}
+
 // ---------- Pencere ----------
 function createWindow() {
   win = new BrowserWindow({
@@ -423,7 +568,8 @@ function createWindow() {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
-      sandbox: true
+      sandbox: true,
+      webviewTag: true
     }
   });
   win.loadFile(path.join(__dirname, 'renderer', 'index.html'));
@@ -446,6 +592,16 @@ function createWindow() {
     }, 1500));
   }
 }
+
+// Önizleme etiketi (webview) yalnızca bu bilgisayardaki geliştirme sunucularını açabilir.
+app.on('web-contents-created', (_e, contents) => {
+  contents.on('will-attach-webview', (event, webPreferences, params) => {
+    delete webPreferences.preload;
+    webPreferences.nodeIntegration = false;
+    webPreferences.contextIsolation = true;
+    if (!/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?(\/|$)/.test(params.src || '')) event.preventDefault();
+  });
+});
 
 app.whenReady().then(createWindow);
 app.on('window-all-closed', () => {

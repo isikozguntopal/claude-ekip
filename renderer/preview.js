@@ -1,0 +1,119 @@
+'use strict';
+// Önizleme paneli: tarayıcı sekmesi (localhost) ve iOS Simulator ekran görüntüsü.
+(() => {
+  const $ = (sel) => document.querySelector(sel);
+  const webview = $('#webview');
+  const urlInput = $('#urlInput');
+  const simDevice = $('#simDevice');
+  const simShot = $('#simShot');
+  const simMsg = $('#simMsg');
+  let pollTimer = null;
+  let busy = false;
+
+  // ---- Sekmeler ----
+  document.querySelectorAll('.pv-tab').forEach((tab) => {
+    tab.onclick = () => {
+      document.querySelectorAll('.pv-tab').forEach((t) => t.classList.toggle('active', t === tab));
+      const sim = tab.dataset.pv === 'sim';
+      $('#pvWeb').classList.toggle('hidden', sim);
+      $('#pvSim').classList.toggle('hidden', !sim);
+      if (sim) startSimPolling(); else stopSimPolling();
+    };
+  });
+
+  // ---- Tarayıcı ----
+  const normalize = (raw) => {
+    let url = String(raw || '').trim();
+    if (!/^https?:\/\//i.test(url)) url = 'http://' + url;
+    return url;
+  };
+  $('#urlForm').onsubmit = (e) => {
+    e.preventDefault();
+    const url = normalize(urlInput.value);
+    urlInput.value = url;
+    webview.src = url;
+  };
+  webview.addEventListener('did-fail-load', (e) => {
+    if (e.errorCode === -3) return; // iptal edildi
+    webview.src = 'data:text/html;charset=utf-8,' + encodeURIComponent(
+      `<body style="font:14px sans-serif;background:#17141f;color:#ece6f6;padding:24px">Sayfa açılamadı: ${e.validatedURL}<br>Geliştirme sunucusu çalışıyor mu?</body>`
+    );
+  });
+
+  // ---- iOS Simulator ----
+  async function loadDevices() {
+    try {
+      const devices = await window.ekip.simList();
+      simDevice.innerHTML = '';
+      for (const d of devices) {
+        const opt = document.createElement('option');
+        opt.value = d.udid;
+        opt.textContent = (d.booted ? '● ' : '') + d.name;
+        simDevice.appendChild(opt);
+      }
+      const booted = devices.find((d) => d.booted);
+      if (booted) simDevice.value = booted.udid;
+      if (!devices.length) simMsg.textContent = 'Kullanılabilir iPhone simülatörü bulunamadı (Xcode kurulu mu?).';
+    } catch (e) {
+      simMsg.textContent = 'Simülatör listesi alınamadı: ' + e.message;
+    }
+  }
+
+  $('#simBoot').onclick = async () => {
+    if (!simDevice.value) return;
+    simMsg.textContent = 'Simülatör açılıyor…';
+    simMsg.classList.remove('hidden');
+    try {
+      await window.ekip.simBoot(simDevice.value);
+      await loadDevices();
+      startSimPolling();
+    } catch (e) {
+      simMsg.textContent = 'Açılamadı: ' + e.message;
+    }
+  };
+
+  async function refreshShot() {
+    if (busy || !simDevice.value) return;
+    busy = true;
+    try {
+      simShot.src = await window.ekip.simShot(simDevice.value);
+      simShot.classList.remove('hidden');
+      simMsg.classList.add('hidden');
+    } catch (e) {
+      simShot.classList.add('hidden');
+      simMsg.classList.remove('hidden');
+      simMsg.textContent = 'Ekran görüntüsü alınamadı. Simülatörü Aç ile başlatın. (' + e.message + ')';
+    } finally {
+      busy = false;
+    }
+  }
+
+  function startSimPolling() {
+    if (pollTimer) return;
+    refreshShot();
+    pollTimer = setInterval(refreshShot, 1000);
+  }
+  function stopSimPolling() {
+    clearInterval(pollTimer);
+    pollTimer = null;
+  }
+
+  // Önizleme paneli sağdan açılır/kapanır
+  const main = document.querySelector("main");
+  $("#pvToggle").onclick = () => {
+    const open = main.classList.toggle("pv-open");
+    $("#pvToggle").classList.toggle("active", open);
+    if (open && !$("#pvSim").classList.contains("hidden")) startSimPolling();
+    if (!open) stopSimPolling();
+  };
+
+  // Ajan preview_open aracı: paneli açar ve adresi tarayıcı sekmesinde gösterir
+  window.ekip.onPreviewOpen(({ url }) => {
+    if (!main.classList.contains('pv-open')) $('#pvToggle').click();
+    document.querySelector('[data-pv="web"]').click();
+    urlInput.value = url;
+    webview.src = url;
+  });
+
+  loadDevices();
+})();

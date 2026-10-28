@@ -273,10 +273,23 @@ function setWorkspace(info) {
   $('#wsPath').textContent = S.workspace;
   $('#wsPath').title = S.workspace;
   clearChat();
+  replayChat();
   renderOffice();
   renderDetail();
   renderLimits();
   refreshLimits();
+}
+
+// Önceki konuşmayı kaldığı yerden yeniden çizer (kayıt main sürecinde tutulur).
+async function replayChat() {
+  const items = await window.ekip.chatHistory();
+  if (!items.length) return;
+  const empty = document.getElementById('emptyChat');
+  if (empty) empty.remove();
+  for (const item of items) {
+    if (item.kind === 'user') addUser(item.text);
+    else if (item.kind === 'event') onEvent(item.msg);
+  }
 }
 
 function toggleWsMenu(show) {
