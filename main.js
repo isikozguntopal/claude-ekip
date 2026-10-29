@@ -504,6 +504,21 @@ ipcMain.handle('sim:shot', async (_e, udid) => {
   return 'data:image/png;base64,' + fs.readFileSync(file).toString('base64');
 });
 
+// ---------- Komut düğmeleri ----------
+const DEFAULT_COMMANDS = [
+  { label: "Xcode'da Unity iOS", cmd: 'open -a /Applications/Xcode-27.1.0.app /Users/isikozguntopal/Documents/Projeler/party-league/unity/Builds/iOS/Unity-iPhone.xcodeproj' }
+];
+ipcMain.handle('cmd:list', () => loadSettings().commands || DEFAULT_COMMANDS);
+ipcMain.handle('cmd:save', (_e, list) => {
+  saveSettings({ commands: list.map((c) => ({ label: String(c.label).slice(0, 60), cmd: String(c.cmd).slice(0, 2000) })) });
+  return true;
+});
+ipcMain.handle('cmd:run', (_e, cmd) => new Promise((resolve) => {
+  execFile('/bin/zsh', ['-lc', String(cmd)], { cwd: loadSettings().workspace || os.homedir(), timeout: 300000, maxBuffer: 8 * 1024 * 1024 }, (err, stdout, stderr) => {
+    resolve({ code: err ? (typeof err.code === 'number' ? err.code : 1) : 0, output: String(stdout) + String(stderr) });
+  });
+}));
+
 // ---------- Ajan önizleme araçları (simülatör + tarayıcı) ----------
 const IDB = [path.join(os.homedir(), '.local/share/ekip-idb-venv/bin/idb'), '/opt/homebrew/bin/idb'].find((p) => fs.existsSync(p)) || 'idb';
 function idb(args) {

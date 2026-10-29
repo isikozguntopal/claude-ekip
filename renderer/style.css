@@ -280,3 +280,12 @@ main.pv-open .preview { display: flex; }
 main.pv-open .office { transform: scale(.8); transform-origin: top left; }
 .left > .office-panel { flex: 1 1 0; min-height: 0; overflow: hidden; display: flex; flex-direction: column; }
 .left > .detail { flex: 1 1 0; min-height: 0; }
+
+/* ---------- Komut düğmeleri ---------- */
+.cmd-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 8px 16px; border-bottom: 2px solid var(--line); }
+.cmd-bar:empty { display: none; }
+.cmd-item { display: inline-flex; align-items: center; gap: 2px; }
+.cmd-del { background: none; border: 0; color: var(--faint); cursor: pointer; font-size: 16px; padding: 0 4px; }
+.cmd-del:hover { color: var(--bad); }
+.cmd-form { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.cmd-form input { background: var(--bg); color: var(--text); border: 2px solid var(--line); padding: 4px 8px; font: 13px var(--mono); min-width: 180px; }
