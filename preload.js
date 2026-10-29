@@ -1,5 +1,5 @@
 'use strict';
-const { contextBridge, ipcRenderer } = require('electron');
+const { contextBridge, ipcRenderer, webUtils } = require('electron');
 
 const on = (channel) => (cb) => {
   const h = (_e, payload) => cb(payload);
@@ -29,6 +29,8 @@ contextBridge.exposeInMainWorld('ekip', {
   setIcon: (dataUrl) => ipcRenderer.send('app:set-icon', dataUrl),
   chatHistory: () => ipcRenderer.invoke('chat:history'),
   onPreviewOpen: on('preview:open'),
+  pathForFile: (file) => webUtils.getPathForFile(file),
+  importShots: (paths) => ipcRenderer.invoke('shot:import', paths),
   cmdList: () => ipcRenderer.invoke('cmd:list'),
   cmdSave: (list) => ipcRenderer.invoke('cmd:save', list),
   cmdRun: (cmd) => ipcRenderer.invoke('cmd:run', cmd),

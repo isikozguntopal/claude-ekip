@@ -289,3 +289,6 @@ main.pv-open .office { transform: scale(.8); transform-origin: top left; }
 .cmd-del:hover { color: var(--bad); }
 .cmd-form { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 .cmd-form input { background: var(--bg); color: var(--text); border: 2px solid var(--line); padding: 4px 8px; font: 13px var(--mono); min-width: 180px; }
+
+/* ---------- Sürükle bırak alanı ---------- */
+.chat.drop { outline: 2px dashed var(--accent); outline-offset: -6px; }

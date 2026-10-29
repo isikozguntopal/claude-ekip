@@ -505,6 +505,25 @@ ipcMain.handle('sim:shot', async (_e, udid) => {
   return 'data:image/png;base64,' + fs.readFileSync(file).toString('base64');
 });
 
+// ---------- Sürükle bırak ekran resmi ----------
+// Bırakılan resimler "ekran resmi N" adıyla kopyalanır; N uygulama genelinde artar.
+const shotDir = () => path.join(app.getPath('userData'), 'ekran-resimleri');
+ipcMain.handle('shot:import', (_e, srcs) => {
+  fs.mkdirSync(shotDir(), { recursive: true });
+  let n = loadSettings().shotSeq || 0;
+  const saved = [];
+  for (const src of srcs) {
+    const ext = path.extname(src).toLowerCase();
+    if (!/^\.(png|jpe?g|gif|webp|heic)$/.test(ext)) continue;
+    n += 1;
+    const dest = path.join(shotDir(), `ekran resmi ${n}${ext}`);
+    fs.copyFileSync(src, dest);
+    saved.push(dest);
+  }
+  saveSettings({ shotSeq: n });
+  return saved;
+});
+
 // ---------- Komut düğmeleri ----------
 const DEFAULT_COMMANDS = [
   { label: "Xcode'da Unity iOS", cmd: 'open -a /Applications/Xcode-27.1.0.app /Users/isikozguntopal/Documents/Projeler/party-league/unity/Builds/iOS/Unity-iPhone.xcodeproj' }
