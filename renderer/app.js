@@ -356,8 +356,8 @@ function addUser(text) {
 }
 
 // Lider bir ekip üyesi adıyla başlıyorsa ("**Piksel (arayüz):** …" ya da "Piksel, …") mesajı o üyenin adına ve görüntüsüyle göster.
-const MEMBER_BOLD = /^\*\*\s*(Süper Mimar|Piksel|Dedektif|Bekçi|Patron)\b[^*]*\*\*:?\s*/i;
-const MEMBER_PLAIN = /^(Süper Mimar|Piksel|Dedektif|Bekçi|Patron)\s*[,:]\s*/i;
+const MEMBER_BOLD = /^\*\*\s*(Süper Mimar|Piksel|Dedektif|Bekçi|Müdür)\b[^*]*\*\*:?\s*/i;
+const MEMBER_PLAIN = /^(Süper Mimar|Piksel|Dedektif|Bekçi|Müdür)\s*[,:]\s*/i;
 
 // Sohbetteki bağlantılar: https → tarayıcı, dosya yolu → varsayılan uygulama
 document.getElementById('log').addEventListener('click', async (e) => {

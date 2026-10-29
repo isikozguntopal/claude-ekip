@@ -9,7 +9,7 @@ Claude Code'u pixel-art bir "ofis"te 5 kişilik geliştirici ekibi olarak yönet
 | Piksel | `frontend-design` | Özgün, üretim kalitesinde arayüz |
 | Dedektif | `code-review` | Paralel ajanlarla kod incelemesi |
 | Bekçi | `security-guidance` | Her düzenlemede güvenlik taraması (hook) |
-| Patron | `gstack` (elle kurulum) | CEO/mühendis/QA gözüyle plan ve yayın |
+| Müdür | `gstack` (elle kurulum) | Mühendislik müdürü/QA gözüyle plan, inceleme ve yayın |
 
 ## Çalıştırma
 

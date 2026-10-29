@@ -1,7 +1,7 @@
 # Claude Ekip
 
 Claude Code'u pixel-art bir "ofis"te 5 kişilik geliştirici ekibi (lider + Süper Mimar, Piksel, Dedektif,
-Bekçi, Patron) olarak yöneten Electron masaüstü uygulaması. Claude Agent SDK ile Claude Code'u çalıştırır;
+Bekçi, Müdür) olarak yöneten Electron masaüstü uygulaması. Claude Agent SDK ile Claude Code'u çalıştırır;
 her ekip üyesi bir plugin'e karşılık gelir (bkz. `team.js`, README).
 
 Önceki konuşmalar (neden böyle yapıldığı, kullanıcının istekleri): `docs/sohbet-gecmisi/claude-ekip-sohbetleri.md`.

@@ -196,8 +196,8 @@
     },
     {
       id: 'ceo',
-      name: 'Patron',
-      title: 'CEO / Ürün Lideri',
+      name: 'Müdür',
+      title: 'Yayın & Kalite Müdürü',
       color: '#e9c46a',
       plugin: 'gstack',
       installId: null,
