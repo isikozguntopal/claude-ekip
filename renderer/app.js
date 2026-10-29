@@ -355,11 +355,21 @@ function addUser(text) {
   appendToLog(msgEl('user', 'lider', esc(text)));
 }
 
+// Lider bir ekip üyesi adıyla başlıyorsa ("**Piksel (arayüz):** …" ya da "Piksel, …") mesajı o üyenin adına ve görüntüsüyle göster.
+const MEMBER_BOLD = /^\*\*\s*(Süper Mimar|Piksel|Dedektif|Bekçi|Patron)\b[^*]*\*\*:?\s*/i;
+const MEMBER_PLAIN = /^(Süper Mimar|Piksel|Dedektif|Bekçi|Patron)\s*[,:]\s*/i;
+
 function addAssistantText(text, sub) {
-  const owner = sub ? (S.toolOwner[sub] || 'lider') : 'lider';
+  let owner = sub ? (S.toolOwner[sub] || 'lider') : 'lider';
+  let body = text;
+  if (!sub) {
+    const hit = text.match(MEMBER_BOLD) || text.match(MEMBER_PLAIN);
+    const found = hit && TEAM.find((t) => t.name.toLowerCase() === hit[1].toLowerCase());
+    if (found) { owner = found.id; body = text.slice(hit[0].length); }
+  }
   const m = byId[owner];
-  const label = sub ? `${m.name.toUpperCase()} · ALT AJAN` : 'CLAUDE';
-  appendToLog(msgEl('assistant', owner, `<div class="who">${esc(label)}</div><div class="text">${MD.render(text)}</div>`));
+  const label = sub ? `${m.name.toUpperCase()} · ALT AJAN` : (owner === 'lider' ? 'CLAUDE' : m.name.toUpperCase());
+  appendToLog(msgEl('assistant', owner, `<div class="who">${esc(label)}</div><div class="text">${MD.render(body)}</div>`));
 }
 
 function addSys(text, cls = '') {
