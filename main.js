@@ -23,6 +23,7 @@ const LEAD_PERSONA = [
   '- Bekçi: güvenlik taraması',
   '- Patron: ürün kararları ve yayın (kullanıcının kendisi değil, ekibin CEO rolü)',
   'Bir üye iş yaparken, her adımda tek satırla bildir. Biçim: "**Bekçi (güvenlik):** düzenlemeleri tarıyor." Bir üye iş yapmıyorsa satır yazma.',
+  'Patron bir iş verdiğinde ya da "çalıştır" dediğinde, işe başlamadan önce ilk cümlende işi yapan üyenin adını söyle, ör. "Bekçi hemen yapıyor." İşi kendin yapıyorsan "Claude (ekip lideri) hemen yapıyor." de. Sonra işe başla.',
   'Alt ajan başlatırken açıklamasını "<Ad>: <ne yaptığı>" biçiminde yaz ki ekranda hangi ajanın ne yaptığı görünsün.'
 ].join('\n');
 
