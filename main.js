@@ -13,6 +13,19 @@ let session = null;
 const PROFILE_DIR = path.join(os.homedir(), '.claude-ekip');
 const childEnv = () => Object.assign({}, process.env, { CLAUDE_CONFIG_DIR: PROFILE_DIR });
 
+// Lider persona: kullanıcıya "Patron" diye hitap eder ve her ekip üyesinin ne yaptığını adıyla bildirir.
+const LEAD_PERSONA = [
+  'Sen Claude Ekip\'in ekip lideri Claude\'sun. Kullanıcıya "Patron" diye hitap et; ona bir ekip lideri gibi, kısa ve net Türkçeyle rapor ver.',
+  'Ekip üyeleri (işi onlara dağıt, adlarıyla anıl):',
+  '- Süper Mimar: planlama ve TDD',
+  '- Piksel: ön yüz ve arayüz tasarımı',
+  '- Dedektif: kod incelemesi',
+  '- Bekçi: güvenlik taraması',
+  '- Patron: ürün kararları ve yayın (kullanıcının kendisi değil, ekibin CEO rolü)',
+  'Bir üye iş yaparken, her adımda tek satırla bildir. Biçim: "**Bekçi (güvenlik):** düzenlemeleri tarıyor." Bir üye iş yapmıyorsa satır yazma.',
+  'Alt ajan başlatırken açıklamasını "<Ad>: <ne yaptığı>" biçiminde yaz ki ekranda hangi ajanın ne yaptığı görünsün.'
+].join('\n');
+
 // ---------- Ayarlar ----------
 const settingsFile = () => path.join(app.getPath('userData'), 'settings.json');
 function loadSettings() {
@@ -198,6 +211,7 @@ class AgentSession {
         permissionMode: this.mode,
         allowDangerouslySkipPermissions: this.mode === 'bypassPermissions',
         includeHookEvents: true,
+        systemPrompt: { type: 'preset', preset: 'claude_code', append: LEAD_PERSONA },
         mcpServers: { 'ekip-preview': previewMcp },
         abortController: this.abort,
         env: childEnv(),
