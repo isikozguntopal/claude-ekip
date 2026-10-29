@@ -8,7 +8,13 @@
     s = s.replace(/`([^`]+)`/g, (_, c) => { codes.push(c); return '\u0000' + (codes.length - 1) + '\u0000'; });
     s = s.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
     s = s.replace(/(^|[^*])\*([^*\s][^*]*)\*/g, '$1<em>$2</em>');
-    s = s.replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, (_, t, u) => /^https:\/\/github\.com\//.test(u) ? `<a href="${u}" target="_blank">${t}</a>` : `<span class="link">${t}</span>`);
+    // [metin](https://…) → tarayıcıda aç; [metin](/mutlak/yol.png) → dosyayı varsayılan uygulamada aç
+    s = s.replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, (_, t, u) => {
+      if (/^https:\/\//.test(u)) return `<a href="#" data-link="${u}">${t}</a>`;
+      if (/^(file:\/\/)?\//.test(u)) return `<a href="#" data-path="${u.replace(/^file:\/\//, '')}">${t}</a>`;
+      return `<span class="link">${t}</span>`;
+    });
+    s = s.replace(/(^|[\s(])(https:\/\/[^\s<)]+)/g, (_, p, u) => `${p}<a href="#" data-link="${u}">${u}</a>`);
     s = s.replace(/\u0000(\d+)\u0000/g, (_, i) => `<code>${codes[+i]}</code>`);
     return s;
   }

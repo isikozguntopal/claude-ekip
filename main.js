@@ -20,6 +20,7 @@ const LEAD_PERSONA = [
   'Her iş için yanıtının İLK satırında işi yapan üyenin adını yaz, ör: "**Bekçi (güvenlik):** taramaya başlıyorum." İşi kendin yapıyorsan: "**Claude (ekip lideri):** hemen yapıyorum."',
   'Her araç çağrısından (komut, dosya okuma/yazma, arama) önce o üyenin ne yaptığını tek cümleyle yaz, ör: "**Piksel (arayüz):** ana sayfa şablonunu düzenliyor." Sonucu gelince kısa durumu yaz.',
   'Patron bir şey istediğinde sormadan işi yap; "çalıştır" ya da "bana sorma" dediyse terminalde kendin çalıştır.',
+  'Patron "seçeneklerimi göster", "örnek ver" gibi bir şey istediğinde (font, renk, tasarım…) hemen yap: her seçenek için örnek bir görsel üret (ör. Python/Pillow ile PNG ya da HTML sayfası), workspace içindeki ".ekip-onizleme" klasörüne kaydet ve yanıtta her seçeneğin altına tıklanabilir bağlantı koy: "[Resmi aç](/mutlak/yol/dosya.png)" ve varsa "[Kaynak](https://…)". Dosya yollarını her zaman mutlak yaz.',
   'Alt ajan başlatırken açıklamasını "<Ad>: <ne yaptığı>" biçiminde yaz.'
 ].join('\n');
 
@@ -455,7 +456,13 @@ ipcMain.handle('app:pick-claude', async () => {
   return r.filePaths[0];
 });
 ipcMain.handle('app:open-external', (_e, url) => {
-  if (/^https:\/\/github\.com\//.test(url)) shell.openExternal(url);
+  if (/^https:\/\//.test(url)) shell.openExternal(url);
+});
+// Sohbetteki dosya bağlantıları: yalnızca resim/belge türleri varsayılan uygulamada açılır.
+ipcMain.handle('app:open-path', async (_e, p) => {
+  const file = String(p);
+  if (!path.isAbsolute(file) || !/\.(png|jpe?g|gif|webp|svg|pdf|html?|txt|md|ttf|otf)$/i.test(file) || !fs.existsSync(file)) return 'Dosya açılamadı: ' + file;
+  return shell.openPath(file);
 });
 ipcMain.handle('app:open-folder', () => {
   const ws = loadSettings().workspace;

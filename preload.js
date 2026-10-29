@@ -25,6 +25,7 @@ contextBridge.exposeInMainWorld('ekip', {
   replyPermission: (reply) => ipcRenderer.send('agent:permission-reply', reply),
   pickClaude: () => ipcRenderer.invoke('app:pick-claude'),
   openExternal: (url) => ipcRenderer.invoke('app:open-external', url),
+  openPath: (p) => ipcRenderer.invoke('app:open-path', p),
   openFolder: () => ipcRenderer.invoke('app:open-folder'),
   setIcon: (dataUrl) => ipcRenderer.send('app:set-icon', dataUrl),
   chatHistory: () => ipcRenderer.invoke('chat:history'),

@@ -359,6 +359,18 @@ function addUser(text) {
 const MEMBER_BOLD = /^\*\*\s*(Süper Mimar|Piksel|Dedektif|Bekçi|Patron)\b[^*]*\*\*:?\s*/i;
 const MEMBER_PLAIN = /^(Süper Mimar|Piksel|Dedektif|Bekçi|Patron)\s*[,:]\s*/i;
 
+// Sohbetteki bağlantılar: https → tarayıcı, dosya yolu → varsayılan uygulama
+document.getElementById('log').addEventListener('click', async (e) => {
+  const a = e.target.closest('a[data-link], a[data-path]');
+  if (!a) return;
+  e.preventDefault();
+  if (a.dataset.link) window.ekip.openExternal(a.dataset.link);
+  else {
+    const err = await window.ekip.openPath(a.dataset.path);
+    if (err) toast(err, 'err');
+  }
+});
+
 function addAssistantText(text, sub) {
   let owner = sub ? (S.toolOwner[sub] || 'lider') : 'lider';
   let body = text;
