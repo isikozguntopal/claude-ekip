@@ -276,10 +276,8 @@ main.pv-open .preview { display: flex; }
 .sim-screen { display: flex; align-items: center; justify-content: center; overflow: hidden; }
 .sim-screen img { max-width: 100%; max-height: 100%; object-fit: contain; }
 .pv-msg { margin: 0; color: var(--faint); font-size: 13px; }
-/* Ofis: önizleme açıkken sıkışır, görseller küçülür */
-main.pv-open .office { transform: scale(.8); transform-origin: top left; }
-.left > .office-panel { flex: 1 1 0; min-height: 0; overflow: hidden; display: flex; flex-direction: column; }
-.left > .detail { flex: 1 1 0; min-height: 0; }
+.left > .office-panel { flex: 3 1 0; min-height: 0; overflow: hidden; display: flex; flex-direction: column; }
+.left > .detail { flex: 2 1 0; min-height: 0; }
 
 /* ---------- Komut düğmeleri ---------- */
 .cmd-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 8px 16px; border-bottom: 2px solid var(--line); }
@@ -292,3 +290,31 @@ main.pv-open .office { transform: scale(.8); transform-origin: top left; }
 
 /* ---------- Sürükle bırak alanı ---------- */
 .chat.drop { outline: 2px dashed var(--accent); outline-offset: -6px; }
+
+/* ---------- Animasyonlu ofis ---------- */
+.office { position: relative; display: block; flex: 1; min-height: 0; padding: 0; gap: 0; overflow: hidden; background: #1b1626; background-image: none; }
+.oscene { position: absolute; left: 0; top: 0; width: 720px; height: 340px; transform-origin: 0 0; }
+.oscene canvas { display: block; image-rendering: pixelated; }
+.oscene .odesk { position: absolute; cursor: pointer; }
+.oactor { position: absolute; width: 48px; height: 54px; cursor: pointer; }
+.oactor::before { content: ''; position: absolute; left: 6px; right: 6px; bottom: -2px; height: 6px; border-radius: 50%; background: rgba(0, 0, 0, .35); }
+.oactor canvas { position: relative; }
+.oactor.flip canvas { transform: scaleX(-1); }
+.oactor.selected canvas { filter: drop-shadow(0 0 3px var(--member)); }
+.oactor.uninstalled canvas { filter: grayscale(1) brightness(.6); }
+.oover { position: absolute; inset: 0; pointer-events: none; }
+.olabel { position: absolute; transform: translateX(-50%); text-align: center; font: 700 10px var(--mono); color: var(--member); white-space: nowrap; pointer-events: auto; cursor: pointer; text-shadow: 0 1px 0 #0c0a12; padding: 1px 6px; border: 1px solid transparent; background: rgba(12, 10, 18, .6); }
+.olabel small { display: block; font-weight: 400; color: var(--muted); font-size: 9px; }
+.olabel .od { display: inline-block; width: 6px; height: 6px; margin-right: 4px; background: var(--faint); }
+.olabel .od.on { background: var(--ok); }
+.olabel.selected { border-color: var(--member); }
+.olabel.active { background: var(--member); color: #1b1626; }
+.olabel.active small { color: #1b1626; }
+.obubble { position: absolute; transform: translate(-50%, -100%); max-width: 170px; background: #f5efe6; color: #1b1626; font: 600 11px var(--mono); padding: 3px 7px; border: 2px solid #1b1626; z-index: 5; opacity: 0; transition: opacity .2s; pointer-events: none; }
+.obubble.show { opacity: 1; }
+.obubble::after { content: ''; position: absolute; left: 50%; bottom: -7px; width: 6px; height: 6px; background: #f5efe6; border-right: 2px solid #1b1626; border-bottom: 2px solid #1b1626; transform: translateX(-50%) rotate(45deg); }
+.owc { position: absolute; transform: translate(-50%, -50%); font: 700 9px var(--mono); color: #1b1626; }
+/* Ofis kutusu sahnenin oranına sabit; kalan yeri detay paneli alır */
+.left > .office-panel { flex: none; }
+.left > .detail { flex: 1 1 0; }
+.office { flex: none; width: 100%; aspect-ratio: 720 / 340; }

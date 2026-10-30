@@ -107,14 +107,7 @@ function activity(memberId, text, opts = {}) {
   list.push({ t: now(), text });
   if (list.length > 80) list.shift();
   S.activeUntil[memberId] = Date.now() + (opts.hold || 4000);
-  const desk = document.querySelector(`.desk[data-id="${memberId}"]`);
-  if (desk) {
-    const b = desk.querySelector('.bubble');
-    b.textContent = text;
-    b.classList.add('show');
-    clearTimeout(b._t);
-    b._t = setTimeout(() => b.classList.remove('show'), opts.hold || 4000);
-  }
+  if (window.Office) Office.say(memberId, text, opts.hold || 4000);
   if (S.selected === memberId) renderActivity();
 }
 
@@ -126,26 +119,7 @@ function isActive(id) {
 // ---------- Ofis ----------
 const OFFICE_ORDER = ['mimar', 'lider', 'tasarimci', 'inceleyici', 'guvenlik', 'ceo'];
 function renderOffice() {
-  const o = $('#office');
-  o.innerHTML = '';
-  for (const id of OFFICE_ORDER) {
-    const m = byId[id];
-    const st = S.status[id];
-    const d = document.createElement('div');
-    d.className = 'desk' + (S.selected === id ? ' selected' : '') + (st && !st.installed ? ' uninstalled' : '');
-    d.dataset.id = id;
-    d.style.setProperty('--member', m.color);
-    d.innerHTML = `<div class="bubble"></div><span class="dot ${st && st.installed ? 'on' : ''}" title="${st && st.installed ? 'Kurulu' : 'Kurulu değil'}"></span>`;
-    const wrap = document.createElement('div');
-    wrap.className = 'sprite-wrap';
-    const c = spriteCanvas(id, 5);
-    c.dataset.sprite = id;
-    wrap.appendChild(c);
-    d.appendChild(wrap);
-    d.insertAdjacentHTML('beforeend', `<div class="table"></div><div class="name">${esc(m.name)}</div><div class="role">${esc(m.title)}</div>`);
-    d.addEventListener('click', () => select(id));
-    o.appendChild(d);
-  }
+  Office.render($('#office'));
   const missing = TEAM.filter((m) => m.installId && S.status[m.id] && !S.status[m.id].installed);
   $('#installAll').classList.toggle('hidden', !S.workspace || !missing.length);
 }
@@ -154,7 +128,7 @@ function tick() {
   const t = Date.now();
   document.querySelectorAll('canvas[data-sprite]').forEach((c) => {
     const id = c.dataset.sprite;
-    const active = isActive(id);
+    const active = isActive(id) || (window.Office && Office.isMoving(id));
     const period = active ? 260 : 900;
     const bob = active ? Math.floor(t / period) % 2 === 0 : Math.floor(t / period) % 4 === 0;
     const blink = (Math.floor(t / 150) + id.length * 7) % 40 === 0;
@@ -181,7 +155,7 @@ function liveInfo(m) {
 
 function select(id) {
   S.selected = id;
-  document.querySelectorAll('.desk').forEach((d) => d.classList.toggle('selected', d.dataset.id === id));
+  if (window.Office) Office.refresh();
   renderDetail();
 }
 
