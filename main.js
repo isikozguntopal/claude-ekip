@@ -21,10 +21,16 @@ const LEAD_PERSONA = [
   'Her araç çağrısından (komut, dosya okuma/yazma, arama) önce o üyenin ne yaptığını tek cümleyle yaz, ör: "**Piksel (arayüz):** ana sayfa şablonunu düzenliyor." Sonucu gelince kısa durumu yaz.',
   'Patron bir şey istediğinde sormadan işi yap; "çalıştır" ya da "bana sorma" dediyse terminalde kendin çalıştır.',
   'Patron "seçeneklerimi göster", "örnek ver" gibi bir şey istediğinde (font, renk, tasarım…) hemen yap: her seçenek için örnek bir görsel üret (ör. Python/Pillow ile PNG ya da HTML sayfası), workspace içindeki ".ekip-onizleme" klasörüne kaydet ve yanıtta her seçeneğin altına tıklanabilir bağlantı koy: "[Resmi aç](/mutlak/yol/dosya.png)" ve varsa "[Kaynak](https://…)". Dosya yollarını her zaman mutlak yaz.',
+  'Resim göstereceğin zaman show_image aracını kullan (sağ paneldeki Resimler sekmesinde açılır); simülatörde bir şey göstereceksen sim_* araçlarını kullan, panel simülatör sekmesine kendiliğinden geçer.',
   'Alt ajan başlatırken açıklamasını "<Ad>: <ne yaptığı>" biçiminde yaz.'
 ].join('\n');
 
 // ---------- Ayarlar ----------
+app.setName('Claude Ekibim');
+app.setPath('userData', path.join(app.getPath('appData'), 'Claude Ekip'));   // eski ayar ve sohbet klasörü korunur
+if (!app.requestSingleInstanceLock()) app.quit();
+app.on('second-instance', () => { if (win) { if (win.isMinimized()) win.restore(); win.focus(); } });
+
 const settingsFile = () => path.join(app.getPath('userData'), 'settings.json');
 function loadSettings() {
   try { return JSON.parse(fs.readFileSync(settingsFile(), 'utf8')); } catch { return {}; }
@@ -542,6 +548,18 @@ ipcMain.handle('cmd:run', (_e, cmd) => new Promise((resolve) => {
   });
 }));
 
+// ---------- Resimler paneli ----------
+const IMG_MIME = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif', webp: 'image/webp', svg: 'image/svg+xml' };
+function showImage(p, caption) {
+  const file = String(p);
+  if (!path.isAbsolute(file) || !/\.(png|jpe?g|gif|webp|svg)$/i.test(file) || !fs.existsSync(file)) throw new Error('Resim bulunamadı: ' + file);
+  if (fs.statSync(file).size > 12 * 1024 * 1024) throw new Error('Resim çok büyük (12 MB üstü)');
+  const ext = path.extname(file).slice(1).toLowerCase();
+  const data = 'data:' + IMG_MIME[ext] + ';base64,' + fs.readFileSync(file).toString('base64');
+  send('preview:image', { path: file, caption: caption || path.basename(file), data });
+}
+ipcMain.handle('img:show', (_e, p) => { try { showImage(p); return null; } catch (e) { return e.message; } });
+
 // ---------- Ajan önizleme araçları (simülatör + tarayıcı) ----------
 const IDB = [path.join(os.homedir(), '.local/share/ekip-idb-venv/bin/idb'), '/opt/homebrew/bin/idb'].find((p) => fs.existsSync(p)) || 'idb';
 function idb(args) {
@@ -553,6 +571,7 @@ function idb(args) {
   });
 }
 async function bootedUdid() {
+  send('preview:focus', { tab: 'sim' });   // simülatörü kullanırken panel simülatör sekmesine geçsin
   const data = JSON.parse((await simctl(['list', 'devices', 'booted', '-j'])).toString());
   const d = Object.values(data.devices).flat().find((x) => x.state === 'Booted');
   if (!d) throw new Error('Açık bir iOS simülatörü yok. Önce simülatörü açın.');
@@ -596,6 +615,10 @@ function previewServer() {
           await idb(['ui', 'text', t, '--udid', udid]);
           return text('Yazıldı');
         })),
+        tool('show_image', 'Bir resmi uygulamanın sağ panelindeki Resimler sekmesinde gösterir (mutlak yol; png, jpg, gif, webp, svg).', { path: z.string(), caption: z.string().optional() }, run(async ({ path: p, caption }) => {
+          showImage(p, caption);
+          return text('Resim gösterildi');
+        })),
         tool('preview_open', 'Önizleme panelinin tarayıcı sekmesinde verilen localhost adresini açar (ör. http://localhost:8888).', { url: z.string() }, run(async ({ url }) => {
           if (!/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?(\/|$)/.test(url)) throw new Error('Yalnızca localhost adresleri açılabilir.');
           if (win && !win.isDestroyed()) win.webContents.send('preview:open', { url });
@@ -614,7 +637,8 @@ function createWindow() {
     minWidth: 1100,
     minHeight: 680,
     backgroundColor: '#17141f',
-    title: 'Claude Ekip',
+    title: 'Claude Ekibim',
+    icon: path.join(__dirname, 'build', 'icon.png'),
     autoHideMenuBar: true,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
@@ -655,7 +679,10 @@ app.on('web-contents-created', (_e, contents) => {
   });
 });
 
-app.whenReady().then(createWindow);
+app.whenReady().then(() => {
+  if (process.platform === 'darwin' && app.dock) app.dock.setIcon(path.join(__dirname, 'build', 'icon.png'));
+  createWindow();
+});
 app.on('window-all-closed', () => {
   resetSession();
   app.quit();

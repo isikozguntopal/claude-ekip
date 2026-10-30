@@ -3,35 +3,38 @@
 // sebilde sohbet eder; görev varken birlikte çalışanlar toplantı alanında konuşur.
 // app.js'ten kullanılan globaller: S, byId, select, isActive, drawSprite.
 (() => {
-  const W = 720, H = 340, A = 3;           // sahne boyutu ve piksel birimi
-  const CORR = 212;                          // koridor (ayak hizası)
+  const W = 720, H = 410, A = 3;           // sahne boyutu ve piksel birimi
+  const CORR = 250;                          // koridor (ayak hizası)
   const SPEED = 64;                          // px / sn
   const SPR_W = 48, SPR_H = 54;              // 16x18 sprite, ölçek 3
 
   // Rütbe: üst sıra liderlik (Süper Mimar · Claude · Müdür), alt sıra ekip (Dedektif · Piksel · Bekçi)
   const SEATS = {
     mimar: { x: 125, y: 130, col: 1 }, lider: { x: 360, y: 130, col: 2 }, ceo: { x: 595, y: 130, col: 3 },
-    inceleyici: { x: 125, y: 282, col: 1 }, tasarimci: { x: 360, y: 282, col: 2 }, guvenlik: { x: 595, y: 282, col: 3 }
+    inceleyici: { x: 125, y: 350, col: 1 }, tasarimci: { x: 360, y: 350, col: 2 }, guvenlik: { x: 595, y: 350, col: 3 }
   };
   const GAPS = { 1: [30, 232], 2: [232, 488], 3: [488] };   // masalar arası geçitler
   const WC = { x: 40, y: 78 };
-  const COOLER_SPOTS = [{ x: 650, y: 206 }, { x: 650, y: 236 }];
-  const MEET_SPOTS = [{ x: 285, y: 220 }, { x: 335, y: 214 }, { x: 385, y: 214 }, { x: 435, y: 220 }];
+  const COOLER_SPOTS = [{ x: 650, y: 244 }, { x: 650, y: 278 }];
+  const MEET_SPOTS = [{ x: 285, y: 258 }, { x: 335, y: 252 }, { x: 385, y: 252 }, { x: 435, y: 258 }];
 
-  const CHIT = [
-    'Sebilin suyu bugün çok soğuk', 'Dünkü build\'i gördün mü?', 'Patron bugün iyi modda gibi', 'Kahve bitmek üzere!',
-    'Testler yeşil, içim rahat', 'Hafta sonu ne yapıyorsun?', 'Bekçi hiçbir şeyi kaçırmıyor', 'Piksel yine 1 piksel kaymış demiş',
-    'Yayından önce bir çay iyi gider', 'Rüyamda merge conflict gördüm', 'Claude her şeyi biliyor, ya biz?', 'Bu ofiste klima hep fazla'
-  ];
-  const OWN = {
-    mimar: ['Önce test yazalım', 'Planı bir daha gözden geçireyim', 'Özelliği küçük parçalara bölelim'],
-    lider: ['Patron bir iş verir mi acaba?', 'Ekibe göz kulak oluyorum', 'Herkes yerinde mi?'],
-    ceo: ['Yayın takvimi ne durumda?', 'Kalite çıtası düşmesin', 'QA listesine bakayım'],
-    inceleyici: ['Şüpheli bir satır gördüm', 'Bu fonksiyon çok uzamış', 'Kodu bir daha okuyayım'],
-    tasarimci: ['Bu buton 2px kaymış', 'Renk paletini dengeleyeyim', 'Boşluklar daha ferah olmalı'],
-    guvenlik: ['Her şey güvenli… şimdilik', 'Bir kez daha tarayayım', 'Şüpheli paket yok']
-  };
-  const MEET = ['Şu kısmı birlikte bakalım', 'Bende tamam', 'Bunu sen al, ben devam ederim', 'Plan şöyle…', 'Bir sorun görmüyorum', 'Sonra tekrar toplanırız'];
+  // Balonlar son isteğe bağlıdır; iş yokken ekip yalnızca bekler.
+  let task = '';
+  const L = (id, t) => ({
+    mimar: [`"${t}" için planı gözden geçiriyorum`, `"${t}" işinde testleri unutmayalım`],
+    lider: [`"${t}" işi nasıl gitti, Patron?`, `"${t}" tamamsa yenisine hazırız`],
+    ceo: [`"${t}" yayına hazır mı?`, `"${t}" için QA listesine bakayım`],
+    inceleyici: [`"${t}" değişikliklerini bir daha okuyayım`, `"${t}" kodunda bir şey kaçmış mı?`],
+    tasarimci: [`"${t}" arayüzde nasıl görünüyor?`, `"${t}" için boşlukları gözden geçireyim`],
+    guvenlik: [`"${t}" için güvenlik taraması temiz mi?`, `"${t}" sonrası bir kez daha tarayayım`]
+  })[id];
+  const ownLines = (id) => (task ? L(id, task) : null);
+  const chatLines = () => (task
+    ? [`"${task}" hakkında ne düşünüyorsun?`, `"${task}" iyi gitti sanki`, `Patron "${task}" için memnun mu acaba?`]
+    : ['Patron\'dan iş bekliyoruz', 'Yeni bir iş gelirse hazırız', '☕ bir yudum alayım']);
+  const meetLines = () => (task
+    ? [`"${task}" için işi paylaşalım`, 'Ben kendi kısmımı alıyorum', 'Bu bitince birlikte gözden geçirelim', 'Bir engel görürsem haber veririm']
+    : ['İşi paylaşalım', 'Bende tamam', 'Bir engel görürsem haber veririm']);
 
   const actors = {};
   const lastAct = {};
@@ -45,7 +48,7 @@
   function drawBackground(c) {
     const g = c.getContext('2d');
     const R = (x, y, w, h, col) => { g.fillStyle = col; g.fillRect(x * A, y * A, w * A, h * A); };
-    for (let ty = 22; ty < 114; ty += 8) for (let tx = 0; tx < 240; tx += 8) R(tx, ty, 8, 8, ((tx + ty) / 8) % 2 ? '#2f2943' : '#352e4b');
+    for (let ty = 22; ty < 138; ty += 8) for (let tx = 0; tx < 240; tx += 8) R(tx, ty, 8, 8, ((tx + ty) / 8) % 2 ? '#2f2943' : '#352e4b');
     R(0, 0, 240, 22, '#2a2440'); R(0, 0, 240, 2, '#3b3360'); R(0, 20, 240, 2, '#1f1a2e'); R(0, 22, 240, 1, '#4a3f66');
     // pencereler
     for (const wx of [57, 163]) {
@@ -60,17 +63,17 @@
     R(4, 3, 15, 19, '#4b2e1f'); R(5, 4, 13, 18, '#7a5236'); R(15, 13, 2, 2, '#e9c46a'); R(7, 5, 9, 4, '#e8e1d0');
     // bitkiler
     const plant = (x, y) => { R(x, y + 6, 6, 4, '#8a4b2e'); R(x + 1, y + 10, 4, 1, '#5d3b26'); R(x + 2, y, 2, 7, '#3f8f4f'); R(x, y + 2, 6, 3, '#4fae61'); R(x + 1, y + 1, 4, 2, '#63c477'); };
-    plant(2, 100); plant(230, 100); plant(212, 26);
+    plant(2, 124); plant(230, 124); plant(212, 26);
     // mutfak köşesi: tezgâh, kahve makinesi, sebil
     R(224, 34, 16, 12, '#6b452c'); R(224, 33, 16, 2, '#b07a52'); R(231, 36, 1, 10, '#4a2f1d');
     R(228, 26, 8, 8, '#2a2a3a'); R(229, 27, 6, 3, '#c0392b'); R(230, 31, 4, 3, '#1b1626'); R(236, 30, 2, 3, '#f5efe6');
-    R(227, 58, 1, 13, '#9aa4b5'); R(228, 58, 8, 13, '#cfd6e0'); R(236, 58, 1, 13, '#9aa4b5');
-    R(229, 50, 6, 8, '#7cc4f0'); R(230, 51, 2, 5, '#a8dcf8'); R(230, 48, 4, 2, '#5aa0d8');
-    R(231, 62, 2, 2, '#c0392b'); R(230, 67, 4, 1, '#9aa4b5');
+    R(227, 70, 1, 13, '#9aa4b5'); R(228, 70, 8, 13, '#cfd6e0'); R(236, 70, 1, 13, '#9aa4b5');
+    R(229, 62, 6, 8, '#7cc4f0'); R(230, 63, 2, 5, '#a8dcf8'); R(230, 60, 4, 2, '#5aa0d8');
+    R(231, 74, 2, 2, '#c0392b'); R(230, 79, 4, 1, '#9aa4b5');
     // toplantı halısı ve ayakta masa
-    R(84, 63, 72, 14, '#432850'); R(84, 63, 72, 1, '#5b3a69'); R(84, 76, 72, 1, '#5b3a69'); R(84, 63, 1, 14, '#5b3a69'); R(155, 63, 1, 14, '#5b3a69');
-    R(107, 58, 20, 3, '#b07a52'); R(107, 61, 20, 1, '#8a5a3b'); R(115, 62, 4, 6, '#5d3b26'); R(112, 68, 10, 1, '#3b2616');
-    R(110, 56, 2, 2, '#f5efe6'); R(121, 56, 2, 2, '#f5efe6');
+    R(84, 75, 72, 16, '#432850'); R(84, 75, 72, 1, '#5b3a69'); R(84, 90, 72, 1, '#5b3a69'); R(84, 75, 1, 16, '#5b3a69'); R(155, 75, 1, 16, '#5b3a69');
+    R(107, 70, 20, 3, '#b07a52'); R(107, 73, 20, 1, '#8a5a3b'); R(115, 74, 4, 6, '#5d3b26'); R(112, 80, 10, 1, '#3b2616');
+    R(110, 68, 2, 2, '#f5efe6'); R(121, 68, 2, 2, '#f5efe6');
     // sandalyeler (masa boşken görünür)
     for (const s of Object.values(SEATS)) {
       g.fillStyle = '#3d3258'; g.fillRect(s.x - 22, s.y - 50, 44, 38);
@@ -266,9 +269,16 @@
     a.bubbleUntil = nowMs() + hold;
   }
 
-  function ambient(a, lines) {
+  function ambient(a) {
     if (a.bubbleUntil > nowMs()) return;
-    say(a.id, pick(lines), 3500);
+    const lines = ownLines(a.id);
+    if (!lines || Math.random() > 0.5) return;   // iş yoksa sessiz kal
+    say(a.id, pick(lines), 3800);
+  }
+
+  function goWander(a) {
+    const dest = { x: 70 + Math.random() * 560, y: CORR - 25 + Math.random() * 55 };
+    walk(a, pathFromSeat(a, dest, dest.x), 'toWander', () => { a.state = 'wander'; a.until = nowMs() + 2500 + Math.random() * 3500; });
   }
 
   function working() { return S.state === 'calisiyor'; }
@@ -281,11 +291,12 @@
       if (away < 3) {
         if (r < 0.18) return goCooler(a);
         if (r < 0.25 && !Object.values(actors).some((o) => o.state === 'wc' || o.state === 'toWC')) return goWC(a);
+        if (r < 0.4) return goWander(a);
       }
-      if (r < 0.6) ambient(a, OWN[a.id]);
+      if (r < 0.6) ambient(a);
     } else {
       if (r < 0.04 && away < 1) return goCooler(a);
-      if (r < 0.2) ambient(a, OWN[a.id]);
+      if (r < 0.2) ambient(a);
     }
   }
 
@@ -305,7 +316,7 @@
       if (t < a.nextTalk) continue;
       a.nextTalk = t + (cooler.length > 1 ? 3200 : 5000) + Math.random() * 1500;
       if (a.bubbleUntil > t) continue;
-      say(a.id, cooler.length > 1 ? pick(CHIT) : '☕ ahh, ne güzel', 3000);
+      say(a.id, cooler.length > 1 ? pick(chatLines()) : (task ? '☕ bir yudum alayım' : pick(chatLines())), 3000);
     }
     if (meeting && t > meeting.nextLine) {
       meeting.nextLine = t + 2600;
@@ -314,7 +325,7 @@
       if (a.state === 'meet') {
         const la = lastAct[id];
         const fresh = la && t - la.t < 20000 && meeting.turn % 2 === 0;
-        say(id, fresh ? la.text : pick(MEET), 3200);
+        say(id, fresh ? la.text : pick(meetLines()), 3200);
       }
     }
   }
@@ -324,9 +335,9 @@
     nextTick = t + 400;
     const all = Object.values(actors);
     for (const a of all) {
-      if ((a.state === 'cooler' || a.state === 'toCooler' || a.state === 'wc' || a.state === 'toWC') && isActive(a.id)) returnToSeat(a);
+      if ((a.state === 'cooler' || a.state === 'toCooler' || a.state === 'wc' || a.state === 'toWC' || a.state === 'wander' || a.state === 'toWander') && isActive(a.id)) returnToSeat(a);
       else if (a.state === 'cooler' && t > a.until) returnToSeat(a);
-      else if (a.state === 'wc' && t > a.until) returnToSeat(a);
+      else if ((a.state === 'wc' || a.state === 'wander') && t > a.until) returnToSeat(a);
       else if (a.state === 'sit' && t > a.nextThink) {
         a.nextThink = t + 2500 + Math.random() * 3500;
         decide(a);
@@ -367,7 +378,15 @@
         a.label.querySelector('.od').classList.toggle('on', !!(st && st.installed));
       }
     },
-    say(id, text, hold) { say(id, text, hold); lastAct[id] = { t: nowMs(), text: String(text).slice(0, 38) }; },
+    say(id, text, hold) {
+      if (/hook|^\s*[{\[]|"async"/i.test(String(text))) return;   // teknik gürültüyü balona koyma
+      say(id, text, hold);
+      lastAct[id] = { t: nowMs(), text: String(text).slice(0, 38) };
+    },
+    setTask(text) {
+      const t = String(text || '').replace(/\s+/g, ' ').trim();
+      task = t.length > 34 ? t.slice(0, 33) + '…' : t;
+    },
     isMoving(id) { return !!(actors[id] && actors[id].path.length); }
   };
 })();

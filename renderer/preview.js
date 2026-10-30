@@ -11,15 +11,43 @@
   let busy = false;
 
   // ---- Sekmeler ----
-  document.querySelectorAll('.pv-tab').forEach((tab) => {
-    tab.onclick = () => {
-      document.querySelectorAll('.pv-tab').forEach((t) => t.classList.toggle('active', t === tab));
-      const sim = tab.dataset.pv === 'sim';
-      $('#pvWeb').classList.toggle('hidden', sim);
-      $('#pvSim').classList.toggle('hidden', !sim);
-      if (sim) startSimPolling(); else stopSimPolling();
-    };
+  const PANES = { web: '#pvWeb', sim: '#pvSim', img: '#pvImg' };
+  function showTab(name) {
+    document.querySelectorAll('.pv-tab').forEach((t) => t.classList.toggle('active', t.dataset.pv === name));
+    for (const [key, sel] of Object.entries(PANES)) $(sel).classList.toggle('hidden', key !== name);
+    if (name === 'sim') startSimPolling(); else stopSimPolling();
+  }
+  document.querySelectorAll('.pv-tab').forEach((tab) => { tab.onclick = () => showTab(tab.dataset.pv); });
+  function openPanel() {
+    if (!document.querySelector('main').classList.contains('pv-open')) $('#pvToggle').click();
+  }
+
+  // ---- Resimler ----
+  const images = [];
+  function showImageAt(i) {
+    const im = images[i];
+    if (!im) return;
+    const main = $('#imgMain');
+    main.src = im.data;
+    main.classList.remove('hidden');
+    $('#imgEmpty').classList.add('hidden');
+    $('#imgCap').textContent = im.caption + '  ·  ' + im.path;
+    $('#imgThumbs').querySelectorAll('img').forEach((t, n) => t.classList.toggle('on', n === i));
+  }
+  $('#imgMain').onclick = () => { const cur = images.find((im) => im.data === $('#imgMain').src); if (cur) window.ekip.openPath(cur.path); };
+  window.ekip.onPreviewImage((im) => {
+    images.push(im);
+    const t = document.createElement('img');
+    t.src = im.data;
+    t.title = im.caption;
+    const idx = images.length - 1;
+    t.onclick = () => showImageAt(idx);
+    $('#imgThumbs').appendChild(t);
+    openPanel();
+    showTab('img');
+    showImageAt(idx);
   });
+  window.ekip.onPreviewFocus(({ tab }) => { if (PANES[tab]) { openPanel(); showTab(tab); } });
 
   // ---- Tarayıcı ----
   const normalize = (raw) => {

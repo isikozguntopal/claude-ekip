@@ -4,3 +4,4 @@ dist/
 .DS_Store
 *.log
 derived/
+build/Claude Ekibim.app/

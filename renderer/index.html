@@ -3,13 +3,13 @@
 <head>
   <meta charset="utf-8" />
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:" />
-  <title>Claude Ekip</title>
+  <title>Claude Ekibim</title>
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
   <header class="topbar">
     <div class="brand-wrap">
-      <div class="brand"><canvas id="brandIcon" width="32" height="32"></canvas><span>CLAUDE EKİP</span></div>
+      <div class="brand"><canvas id="brandIcon" width="32" height="32"></canvas><span>CLAUDE EKİBİM</span></div>
       <div class="acct-wrap">
         <button id="acctBtn" class="acct-btn" title="Bu uygulamanın Claude hesabı">
           <span class="acct-dot"></span>
@@ -84,6 +84,7 @@
             <div class="pv-tabs">
               <button class="pv-tab active" data-pv="web">Tarayıcı</button>
               <button class="pv-tab" data-pv="sim">iOS Simulator</button>
+            <button class="pv-tab" data-pv="img">Resimler</button>
             </div>
           </div>
           <div id="pvWeb" class="pv-body">
@@ -93,7 +94,15 @@
             </form>
             <webview id="webview" class="pv-frame" src="about:blank"></webview>
           </div>
-          <div id="pvSim" class="pv-body hidden">
+          <div id="pvImg" class="pv-body hidden">
+          <div class="img-stage">
+            <img id="imgMain" alt="" class="hidden" title="Varsayılan uygulamada aç" />
+            <p id="imgEmpty" class="pv-msg">Henüz resim yok. Ajan bir resim gösterdiğinde ya da bir resim bağlantısına tıkladığında burada açılır.</p>
+          </div>
+          <div id="imgCap" class="img-cap"></div>
+          <div id="imgThumbs" class="img-thumbs"></div>
+        </div>
+        <div id="pvSim" class="pv-body hidden">
             <div class="pv-bar">
               <select id="simDevice"></select>
               <button id="simBoot" class="btn btn-small">Aç</button>

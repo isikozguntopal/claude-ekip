@@ -317,4 +317,25 @@ main.pv-open .preview { display: flex; }
 /* Ofis kutusu sahnenin oranına sabit; kalan yeri detay paneli alır */
 .left > .office-panel { flex: none; }
 .left > .detail { flex: 1 1 0; }
-.office { flex: none; width: 100%; aspect-ratio: 720 / 340; }
+.office { flex: none; width: 100%; aspect-ratio: 720 / 410; }
+
+/* ---------- Kompakt ajan detayı ---------- */
+.detail { display: flex; flex-direction: column; overflow: hidden; padding: 10px 14px; }
+.detail-head { gap: 10px; align-items: center; }
+.detail h3 { font-size: 16px; }
+.detail h3 .sub { font-size: 10px; margin-left: 8px; font-weight: 400; }
+.detail .install-row { margin-top: 4px; }
+.detail details.more { margin-top: 6px; max-height: 45%; overflow: auto; flex: none; }
+.detail details.more summary { cursor: pointer; font: 700 11px var(--mono); letter-spacing: 2px; color: var(--muted); }
+.detail .activity { flex: 1; min-height: 60px; max-height: none; }
+.detail > h4 { margin: 8px 0 4px; }
+
+/* ---------- Resimler sekmesi ---------- */
+.img-stage { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; background: #000; overflow: auto; }
+.img-stage img { max-width: 100%; max-height: 100%; object-fit: contain; cursor: zoom-in; }
+.img-cap { padding: 6px 10px; font: 11px var(--mono); color: var(--muted); border-top: 2px solid var(--line); word-break: break-all; }
+.img-cap:empty { display: none; }
+.img-thumbs { display: flex; gap: 6px; padding: 6px; overflow-x: auto; border-top: 2px solid var(--line); }
+.img-thumbs:empty { display: none; }
+.img-thumbs img { height: 48px; border: 2px solid transparent; cursor: pointer; }
+.img-thumbs img.on { border-color: var(--accent); }

@@ -1,6 +1,6 @@
 {
   "name": "claude-ekip",
-  "productName": "Claude Ekip",
+  "productName": "Claude Ekibim",
   "version": "1.0.0",
   "description": "Claude Code'u 5 kişilik pixel-art geliştirici ekibi olarak yöneten masaüstü uygulaması",
   "main": "main.js",
@@ -8,7 +8,7 @@
   "author": "gtech",
   "license": "UNLICENSED",
   "scripts": {
-    "start": "electron .",
+    "start": "node scripts/start.js",
     "package": "node scripts/package-win.js"
   },
   "dependencies": {

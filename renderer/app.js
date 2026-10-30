@@ -106,6 +106,7 @@ function activity(memberId, text, opts = {}) {
   const list = S.activity[memberId];
   list.push({ t: now(), text });
   if (list.length > 80) list.shift();
+  if (S.replaying) return;
   S.activeUntil[memberId] = Date.now() + (opts.hold || 4000);
   if (window.Office) Office.say(memberId, text, opts.hold || 4000);
   if (S.selected === memberId) renderActivity();
@@ -176,25 +177,27 @@ function renderDetail() {
   el.innerHTML = `
     <div class="detail-head">
       <div id="detailSprite"></div>
-      <div>
-        <h3>${esc(m.name)}</h3>
-        <div class="sub">${esc(m.title.toUpperCase())}${m.plugin ? ' · plugin: ' + esc(m.plugin) : ''}</div>
-        <p class="tagline">${esc(m.tagline)}</p>
-        ${m.repo ? `<button class="link-btn" id="repoLink">${esc(m.repo.replace('https://github.com/', 'github.com/'))}</button>` : ''}
+      <div class="dh-main">
+        <h3>${esc(m.name)} <span class="sub">${esc(m.title.toUpperCase())}</span></h3>
+        <div class="install-row">${installHtml}</div>
       </div>
     </div>
-    <div class="install-row">${installHtml}</div>
-    ${m.manualInstall && !(st && st.installed) ? `<div class="note">${esc(m.manualInstall)}</div>` : ''}
-    <h4>NE YAPAR</h4>
-    <div>${esc(m.what)}</div>
-    <h4>ARKADA NE ÇALIŞTIRIR</h4>
-    <ul>${m.runs.map((r) => `<li>${esc(r)}</li>`).join('')}</ul>
-    ${live && live.skills.length ? `<h4>BU OTURUMDA YÜKLÜ SKILL'LER</h4><div class="chips">${live.skills.map((s) => `<span>${esc(s)}</span>`).join('')}</div>` : ''}
-    <h4>HIZLI KOMUTLAR</h4>
-    <div class="quick">${m.quick.map((q, i) => `<button class="btn btn-small" data-q="${i}" title="${esc(q.text)}">${esc(q.label)}</button>`).join('')}</div>
+    <details class="more">
+      <summary>Bu ajan hakkında</summary>
+      <p class="tagline">${esc(m.tagline)}</p>
+      ${m.repo ? `<button class="link-btn" id="repoLink">${esc(m.repo.replace('https://github.com/', 'github.com/'))}</button>` : ''}
+      ${m.manualInstall && !(st && st.installed) ? `<div class="note">${esc(m.manualInstall)}</div>` : ''}
+      <h4>NE YAPAR</h4>
+      <div>${esc(m.what)}</div>
+      <h4>ARKADA NE ÇALIŞTIRIR</h4>
+      <ul>${m.runs.map((r) => `<li>${esc(r)}</li>`).join('')}</ul>
+      ${live && live.skills.length ? `<h4>BU OTURUMDA YÜKLÜ SKILL'LER</h4><div class="chips">${live.skills.map((s) => `<span>${esc(s)}</span>`).join('')}</div>` : ''}
+      <h4>HIZLI KOMUTLAR</h4>
+      <div class="quick">${m.quick.map((q, i) => `<button class="btn btn-small" data-q="${i}" title="${esc(q.text)}">${esc(q.label)}</button>`).join('')}</div>
+    </details>
     <h4>CANLI ETKİNLİK</h4>
     <div class="activity" id="activity"></div>`;
-  const big = spriteCanvas(m.id, 6);
+  const big = spriteCanvas(m.id, 4);
   big.dataset.sprite = m.id;
   $('#detailSprite').appendChild(big);
   el.querySelectorAll('[data-q]').forEach((b) => b.addEventListener('click', () => {
@@ -260,10 +263,15 @@ async function replayChat() {
   if (!items.length) return;
   const empty = document.getElementById('emptyChat');
   if (empty) empty.remove();
-  for (const item of items) {
-    if (item.kind === 'user') addUser(item.text);
-    else if (item.kind === 'event') onEvent(item.msg);
-  }
+  S.replaying = true;   // geçmişi çizerken ofiste balon/hareket başlatma
+  let lastUser = '';
+  try {
+    for (const item of items) {
+      if (item.kind === 'user') { addUser(item.text); lastUser = item.text; }
+      else if (item.kind === 'event') onEvent(item.msg);
+    }
+  } finally { S.replaying = false; }
+  if (lastUser && window.Office) Office.setTask(lastUser);
 }
 
 function toggleWsMenu(show) {
@@ -340,7 +348,9 @@ document.getElementById('log').addEventListener('click', async (e) => {
   e.preventDefault();
   if (a.dataset.link) window.ekip.openExternal(a.dataset.link);
   else {
-    const err = await window.ekip.openPath(a.dataset.path);
+    // Resimler uygulamanın içinde (sağ panel) açılır, diğer dosyalar varsayılan uygulamada
+    const isImg = /\.(png|jpe?g|gif|webp|svg)$/i.test(a.dataset.path);
+    const err = isImg ? await window.ekip.showImage(a.dataset.path) : await window.ekip.openPath(a.dataset.path);
     if (err) toast(err, 'err');
   }
 });
@@ -577,6 +587,7 @@ async function sendMessage() {
   hideSlash();
   updateLeadHint();
   addUser(text);
+  if (window.Office) Office.setTask(text);
   if (text.startsWith('/')) {
     const who = attribute({ kind: 'command', text });
     S.lead = who !== 'lider' ? who : null;
@@ -827,7 +838,6 @@ async function boot() {
   const sq = document.createElement('canvas');
   sq.width = 128; sq.height = 128;
   sq.getContext('2d').drawImage(big, 0, -12);
-  window.ekip.setIcon(sq.toDataURL('image/png'));
 
   const info = await window.ekip.init();
   S.recent = info.settings.recent || [];
