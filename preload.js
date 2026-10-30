@@ -31,6 +31,7 @@ contextBridge.exposeInMainWorld('ekip', {
   onPreviewFocus: on('preview:focus'),
   openFolder: () => ipcRenderer.invoke('app:open-folder'),
   setIcon: (dataUrl) => ipcRenderer.send('app:set-icon', dataUrl),
+  summarizeTask: (text) => ipcRenderer.invoke('task:summarize', text),
   chatHistory: () => ipcRenderer.invoke('chat:history'),
   onPreviewOpen: on('preview:open'),
   pathForFile: (file) => webUtils.getPathForFile(file),

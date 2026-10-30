@@ -108,7 +108,7 @@ function activity(memberId, text, opts = {}) {
   if (list.length > 80) list.shift();
   if (S.replaying) return;
   S.activeUntil[memberId] = Date.now() + (opts.hold || 4000);
-  if (window.Office) Office.say(memberId, text, opts.hold || 4000);
+  if (window.Office && !opts.noBubble) Office.say(memberId, text, opts.hold || 4000);
   if (S.selected === memberId) renderActivity();
 }
 
@@ -577,6 +577,17 @@ function updateLeadHint() {
   $('#leadHint').textContent = who && who !== 'lider' ? `▸ Bu işi ${byId[who].name} (${byId[who].title}) yürütecek` : '';
 }
 
+// Balonlara yazılan istek: önce kaba özet, sonra küçük bir model çağrısıyla gerçek özet
+function summarizeTask(text) {
+  if (!window.Office) return;
+  Office.setTask(text);
+  window.ekip.summarizeTask(text).then((s) => {
+    if (!s) return;
+    Office.setTask(s, true);
+    Office.say('lider', 'Anlaşıldı: ' + s, 4500);
+  }).catch(() => {});
+}
+
 async function sendMessage() {
   const inp = $('#input');
   const text = inp.value.trim();
@@ -587,7 +598,6 @@ async function sendMessage() {
   hideSlash();
   updateLeadHint();
   addUser(text);
-  if (window.Office) Office.setTask(text);
   if (text.startsWith('/')) {
     const who = attribute({ kind: 'command', text });
     S.lead = who !== 'lider' ? who : null;
@@ -596,8 +606,9 @@ async function sendMessage() {
     const who = pre ? attribute({ kind: 'skill', name: pre[0] }) : 'lider';
     S.lead = who !== 'lider' ? who : null;
   }
-  if (S.lead) activity(S.lead, 'işi devraldı: ' + short(text, 50));
-  activity('lider', 'istek alındı: ' + short(text, 50));
+  if (S.lead) activity(S.lead, 'işi devraldı: ' + short(text, 50), { noBubble: true });
+  activity('lider', 'istek alındı: ' + short(text, 50), { noBubble: true });
+  summarizeTask(text);
   try {
     await window.ekip.send(text, S.mode);
   } catch (e) {

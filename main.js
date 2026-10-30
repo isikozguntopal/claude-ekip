@@ -28,7 +28,7 @@ const LEAD_PERSONA = [
 // ---------- Ayarlar ----------
 app.setName('Claude Ekibim');
 app.setPath('userData', path.join(app.getPath('appData'), 'Claude Ekip'));   // eski ayar ve sohbet klasörü korunur
-if (!app.requestSingleInstanceLock()) app.quit();
+if (!process.env.EKIP_SNAPSHOT && !app.requestSingleInstanceLock()) app.quit();   // test çekimi açık uygulamayı engellemesin
 app.on('second-instance', () => { if (win) { if (win.isMinimized()) win.restore(); win.focus(); } });
 
 const settingsFile = () => path.join(app.getPath('userData'), 'settings.json');
@@ -512,6 +512,38 @@ ipcMain.handle('sim:shot', async (_e, udid) => {
   const file = path.join(os.tmpdir(), `ekip-sim-${process.pid}.png`);
   await simctl(['io', udid, 'screenshot', '--type=png', file]);
   return 'data:image/png;base64,' + fs.readFileSync(file).toString('base64');
+});
+
+// ---------- İstek özeti (ofis balonları için) ----------
+ipcMain.handle('task:summarize', async (_e, text) => {
+  const abort = new AbortController();
+  const timer = setTimeout(() => abort.abort(), 25000);
+  try {
+    const exe = findClaudeExe();
+    if (!exe) return null;
+    const { query } = await loadSdk();
+    const q = query({
+      prompt: String(text).slice(0, 1500),
+      options: {
+        cwd: os.tmpdir(),
+        pathToClaudeCodeExecutable: exe,
+        model: 'claude-haiku-5-5',
+        systemPrompt: 'Kullanıcının isteğini Türkçe, en fazla 4 kelimelik bir isim tamlamasına özetle (ör. "Font seçenekleri"). Yalnızca özeti yaz; tırnak, nokta ve açıklama ekleme.',
+        env: childEnv(),
+        settingSources: [],
+        tools: [],
+        maxTurns: 1,
+        persistSession: false,
+        abortController: abort
+      }
+    });
+    let out = '';
+    for await (const msg of q) {
+      if (msg.type === 'assistant') for (const b of (msg.message && msg.message.content) || []) if (b.type === 'text') out += b.text;
+    }
+    const s = out.trim().replace(/["“”.]/g, '').split('\n')[0].slice(0, 40);
+    return s || null;
+  } catch { return null; } finally { clearTimeout(timer); }
 });
 
 // ---------- Sürükle bırak ekran resmi ----------

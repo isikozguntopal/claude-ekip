@@ -20,20 +20,28 @@
 
   // Balonlar son isteğe bağlıdır; iş yokken ekip yalnızca bekler.
   let task = '';
+  const lower = (s) => (s ? s.charAt(0).toLocaleLowerCase('tr') + s.slice(1) : s);
+  const STOP = new Set(['bana', 'ben', 'sen', 'bir', 'bu', 'şu', 'o', 've', 'ile', 'de', 'da', 'mi', 'mı', 'mu', 'mü', 'için', 'lütfen', 'şunu', 'bunu', 'biraz', 'hemen', 'gibi', 'ama', 'sonra', 'önce', 'şey', 'yap', 'yapar', 'mısın', 'misin', 'olsun', 'istiyorum', 'lazım', 'bi', 'çok', 'daha', 'şöyle', 'böyle']);
+  // Özet gelene kadar kaba özet: dolgu sözcükleri atıp ilk birkaç anlamlı sözcüğü al
+  const roughSummary = (text) => {
+    const words = String(text || '').replace(/[^\p{L}\p{N}\s-]/gu, ' ').split(/\s+/).filter((w) => w && !STOP.has(w.toLocaleLowerCase('tr')));
+    const s = words.slice(0, 4).join(' ');
+    return s ? s.charAt(0).toLocaleUpperCase('tr') + s.slice(1) : '';
+  };
   const L = (id, t) => ({
-    mimar: [`"${t}" için planı gözden geçiriyorum`, `"${t}" işinde testleri unutmayalım`],
-    lider: [`"${t}" işi nasıl gitti, Patron?`, `"${t}" tamamsa yenisine hazırız`],
-    ceo: [`"${t}" yayına hazır mı?`, `"${t}" için QA listesine bakayım`],
-    inceleyici: [`"${t}" değişikliklerini bir daha okuyayım`, `"${t}" kodunda bir şey kaçmış mı?`],
-    tasarimci: [`"${t}" arayüzde nasıl görünüyor?`, `"${t}" için boşlukları gözden geçireyim`],
-    guvenlik: [`"${t}" için güvenlik taraması temiz mi?`, `"${t}" sonrası bir kez daha tarayayım`]
+    mimar: [`${t} için planı gözden geçiriyorum`, `${t} işinde testleri unutmayalım`],
+    lider: [`${t} işi nasıl gitti, Patron?`, `${t} tamamsa yenisine hazırız`],
+    ceo: [`${t} yayına hazır mı?`, `${t} için QA listesine bakayım`],
+    inceleyici: [`${t} değişikliklerini bir daha okuyayım`, `${t} kodunda bir şey kaçmış mı?`],
+    tasarimci: [`${t} arayüzde nasıl görünüyor?`, `${t} için boşlukları gözden geçireyim`],
+    guvenlik: [`${t} için güvenlik taraması temiz mi?`, `${t} sonrası bir kez daha tarayayım`]
   })[id];
   const ownLines = (id) => (task ? L(id, task) : null);
   const chatLines = () => (task
-    ? [`"${task}" hakkında ne düşünüyorsun?`, `"${task}" iyi gitti sanki`, `Patron "${task}" için memnun mu acaba?`]
+    ? [`${task} hakkında ne düşünüyorsun?`, `${task} iyi gitti sanki`, `Patron ${lower(task)} için memnun mu acaba?`]
     : ['Patron\'dan iş bekliyoruz', 'Yeni bir iş gelirse hazırız', '☕ bir yudum alayım']);
   const meetLines = () => (task
-    ? [`"${task}" için işi paylaşalım`, 'Ben kendi kısmımı alıyorum', 'Bu bitince birlikte gözden geçirelim', 'Bir engel görürsem haber veririm']
+    ? [`${task} için işi paylaşalım`, 'Ben kendi kısmımı alıyorum', 'Bu bitince birlikte gözden geçirelim', 'Bir engel görürsem haber veririm']
     : ['İşi paylaşalım', 'Bende tamam', 'Bir engel görürsem haber veririm']);
 
   const actors = {};
@@ -383,9 +391,9 @@
       say(id, text, hold);
       lastAct[id] = { t: nowMs(), text: String(text).slice(0, 38) };
     },
-    setTask(text) {
-      const t = String(text || '').replace(/\s+/g, ' ').trim();
-      task = t.length > 34 ? t.slice(0, 33) + '…' : t;
+    setTask(text, summarized) {
+      const t = summarized ? String(text || '').trim() : roughSummary(text);
+      task = t.length > 40 ? t.slice(0, 39) + '…' : t;
     },
     isMoving(id) { return !!(actors[id] && actors[id].path.length); }
   };
