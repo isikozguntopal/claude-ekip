@@ -244,8 +244,12 @@
 
   const EDIT_TOOLS = /^(Edit|Write|MultiEdit|NotebookEdit)$/;
 
+  // Gerçek alt ajan türleri (main.js TEAM_AGENTS) -> ekip üyesi
+  const AGENT_MEMBER = { supermimar: 'mimar', piksel: 'tasarimci', dedektif: 'inceleyici', bekci: 'guvenlik' };
+
   // Bir olayı (tool_use, hook, kullanıcı komutu) ekip üyesine eşler.
   function attribute(ev) {
+    if (ev.kind === 'agent' && ev.subagent && AGENT_MEMBER[ev.subagent]) return AGENT_MEMBER[ev.subagent];
     for (const m of TEAM) {
       const r = m.match || {};
       if (ev.kind === 'skill' && r.skill && r.skill.test(ev.name)) return m.id;

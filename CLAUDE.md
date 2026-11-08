@@ -22,6 +22,7 @@ renderer/     Arayüz (app.js, index.html, style.css, markdown.js) — pixel-art
 scripts/package-win.js   Windows paketleme (imzalı electron.exe'yi kopyalayıp yeniden adlandırır)
 ```
 
+- Gerçek alt ajanlar `main.js` içindeki `TEAM_AGENTS`: supermimar, piksel (Sonnet), dedektif, bekci (Haiku, salt okunur). Lider (`LEAD_PERSONA`) yalnızca büyük işi böler, küçük işi kendi yapar; arayüz `team.js` `AGENT_MEMBER` ile alt ajan türünü üyeye eşler. Müdür (gstack) alt ajan değil, skill paketidir.
 - Uygulamanın ayrı bir Claude profili var: `~/.claude-ekip` (`CLAUDE_CONFIG_DIR`). Ana Claude hesabından bağımsız giriş.
 - Ayarlar: Electron `userData` klasöründe `settings.json` (`claudePath`, son çalışma klasörü, model…).
 

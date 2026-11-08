@@ -384,7 +384,7 @@ function addTool(block, parentId) {
     owner = attribute({ kind: 'skill', name: input.skill || input.command || '' });
     if (owner !== 'lider') S.lead = owner;
   } else if (name === 'Agent' || name === 'Task') {
-    const a = attribute({ kind: 'agent', text: `${input.description || ''} ${input.subagent_type || ''}` });
+    const a = attribute({ kind: 'agent', subagent: input.subagent_type, text: `${input.description || ''} ${input.subagent_type || ''}` });
     owner = a !== 'lider' ? a : (S.lead || 'lider');
   } else owner = S.lead || 'lider';
   S.toolOwner[block.id] = owner;
