@@ -597,6 +597,7 @@ async function sendMessage() {
   inp.value = '';
   hideSlash();
   updateLeadHint();
+  renderEstimate();
   addUser(text);
   if (text.startsWith('/')) {
     const who = attribute({ kind: 'command', text });
@@ -613,6 +614,62 @@ async function sendMessage() {
     await window.ekip.send(text, S.mode);
   } catch (e) {
     addSys('Gönderilemedi: ' + (e.message || e), 'err');
+  }
+}
+
+
+// ---------- İş öncesi token / limit tahmini ----------
+const fmtTok = (n) => n >= 1e6 ? (n / 1e6).toFixed(1) + ' milyon' : n >= 1000 ? Math.round(n / 1000) + ' bin' : String(Math.round(n));
+let estTimer = null;
+async function renderEstimate() {
+  const el = $('#estimate');
+  if (!el) return;
+  if (!$('#input').value.trim()) { el.textContent = ''; el.className = 'estimate'; return; }
+  let e = null;
+  try { e = await window.ekip.estimate(S.model); } catch { /* yoksay */ }
+  if (!e || !e.n) { el.className = 'estimate'; el.textContent = 'Tahmin: henüz ölçüm yok — ilk işlerden sonra token ve limit etkisini öğrenir.'; return; }
+  const left = S.limits && S.limits.rate_limits && S.limits.rate_limits.five_hour && typeof S.limits.rate_limits.five_hour.utilization === 'number'
+    ? Math.max(0, 100 - S.limits.rate_limits.five_hour.utilization) : null;
+  let txt = `Tahmin (son ${e.n} işe göre${e.sameModel ? '' : ', farklı model'}): ~${fmtTok(e.tokMed)} token`;
+  let cls = 'estimate';
+  if (e.pctN >= 2 && e.pctMed != null) {
+    txt += ` ≈ %${e.pctMed.toFixed(1)} 5 saatlik limit (kötü durumda %${e.pctHigh.toFixed(1)})`;
+    if (left != null) {
+      txt += ` · şu an %${Math.round(left)} kaldı → iş sonrası ~%${Math.max(0, Math.round(left - e.pctMed))}`;
+      if (left - e.pctHigh < 0) cls += ' bad'; else if (left - e.pctHigh < 15) cls += ' warn';
+    }
+  } else {
+    txt += ' · limit etkisi için henüz yeterli ölçüm yok';
+    if (left != null) txt += ` · şu an %${Math.round(left)} kaldı`;
+  }
+  el.className = cls;
+  el.textContent = txt;
+}
+
+// ---------- Eski oturumlar ----------
+async function openHistory() {
+  const box = $('#hist'), list = $('#histList');
+  box.classList.remove('hidden');
+  list.innerHTML = '<div class="hist-empty">yükleniyor…</div>';
+  const rows = await window.ekip.archiveList();
+  if (!rows.length) { list.innerHTML = '<div class="hist-empty">Henüz arşivlenmiş oturum yok. "Yeni oturum"a bastığında mevcut oturum buraya kaydedilir.</div>'; return; }
+  list.innerHTML = '';
+  for (const r of rows) {
+    const d = document.createElement('div');
+    d.className = 'hist-item';
+    const when = new Date(r.ts).toLocaleString('tr-TR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+    d.innerHTML = `<div class="t">${esc(r.title)}</div><div class="m">${esc(when)} · ${r.count} mesaj${r.resumable ? '' : ' · yalnız okunur'}</div><div class="a"></div>`;
+    const a = d.querySelector('.a');
+    const btn = (label, fn) => { const b = document.createElement('button'); b.className = 'btn'; b.textContent = label; b.onclick = fn; a.appendChild(b); };
+    btn('Aç ve devam et', async () => {
+      if (!(await window.ekip.archiveRestore(r.id))) { toast('Oturum açılamadı.', 'err'); return; }
+      box.classList.add('hidden');
+      S.live = null;
+      clearChat(); replayChat(); renderOffice(); renderDetail(); refreshLimits();
+      toast(r.resumable ? 'Oturum geri yüklendi, kaldığı yerden devam eder.' : 'Sohbet geri yüklendi (Claude bağlamı yok, yeni bağlamla devam eder).');
+    });
+    btn('Sil', async () => { await window.ekip.archiveDelete(r.id); d.remove(); });
+    list.appendChild(d);
   }
 }
 
@@ -838,6 +895,7 @@ async function refreshLimits() {
     if (u) S.limits = u;
   } finally { limitsBusy = false; }
   renderLimits();
+  renderEstimate();
 }
 
 // ---------- Başlat ----------
@@ -904,7 +962,11 @@ async function boot() {
   $('#send').addEventListener('click', sendMessage);
   $('#stop').addEventListener('click', () => window.ekip.interrupt());
   const inp = $('#input');
-  inp.addEventListener('input', () => { showSlash(); updateLeadHint(); });
+  inp.addEventListener('input', () => { showSlash(); updateLeadHint(); clearTimeout(estTimer); estTimer = setTimeout(renderEstimate, 400); });
+  $('#histBtn').addEventListener('click', openHistory);
+  $('#histClose').addEventListener('click', () => $('#hist').classList.add('hidden'));
+  $('#hist').addEventListener('click', (e) => { if (e.target.id === 'hist') $('#hist').classList.add('hidden'); });
+  window.ekip.onEstimate(() => { refreshLimits().then(renderEstimate); });
   inp.addEventListener('keydown', (e) => {
     const menu = $('#slashMenu');
     if (!menu.classList.contains('hidden')) {

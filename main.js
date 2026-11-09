@@ -90,6 +90,59 @@ function clearChatLog(ws) {
   try { fs.writeFileSync(chatFile(), readChatLines().filter((l) => l.ws !== ws).map((l) => JSON.stringify(l) + '\n').join('')); } catch { /* yoksay */ }
 }
 
+
+// ---------- Eski oturum arşivi ----------
+// "Yeni oturum" sohbeti silmek yerine userData/archive/<id>.json olarak saklar.
+const archiveDir = () => path.join(app.getPath('userData'), 'archive');
+function archiveCurrent(ws) {
+  try {
+    const lines = readChatLines().filter((l) => l.ws === ws);
+    const firstUser = lines.find((l) => l.item && l.item.kind === 'user');
+    if (!firstUser) return null;
+    fs.mkdirSync(archiveDir(), { recursive: true });
+    const id = String(Date.now());
+    const st = loadSettings();
+    const rec = {
+      id, ws, ts: Date.now(),
+      title: String(firstUser.item.text).replace(/\s+/g, ' ').trim().slice(0, 90),
+      count: lines.filter((l) => l.item.kind === 'user').length,
+      sessionId: st.sessionWs === ws ? st.sessionId : null,
+      items: lines.map((l) => l.item)
+    };
+    fs.writeFileSync(path.join(archiveDir(), id + '.json'), JSON.stringify(rec));
+    return id;
+  } catch (e) { console.error('Arşivlenemedi:', e.message); return null; }
+}
+function listArchive(ws) {
+  try {
+    return fs.readdirSync(archiveDir()).filter((f) => f.endsWith('.json')).map((f) => {
+      try { const r = JSON.parse(fs.readFileSync(path.join(archiveDir(), f), 'utf8')); return { id: r.id, ws: r.ws, ts: r.ts, title: r.title, count: r.count, resumable: !!r.sessionId }; } catch { return null; }
+    }).filter((r) => r && r.ws === ws).sort((a, b) => b.ts - a.ts);
+  } catch { return []; }
+}
+const archiveFile = (id) => path.join(archiveDir(), String(id).replace(/[^0-9]/g, '') + '.json');
+
+// ---------- İş başına token/limit istatistiği (tahmin için) ----------
+const statsFile = () => path.join(app.getPath('userData'), 'task-stats.jsonl');
+function readStats() {
+  try { return fs.readFileSync(statsFile(), 'utf8').split('\n').filter(Boolean).map((l) => { try { return JSON.parse(l); } catch { return null; } }).filter(Boolean); } catch { return []; }
+}
+function median(a) { if (!a.length) return null; const b = [...a].sort((x, y) => x - y); return b[Math.floor(b.length / 2)]; }
+function pct80(a) { if (!a.length) return null; const b = [...a].sort((x, y) => x - y); return b[Math.min(b.length - 1, Math.ceil(b.length * 0.8) - 1)]; }
+function estimateFor(model) {
+  const all = readStats().filter((r) => r.tokens > 0);
+  let rows = all.filter((r) => r.model === model).slice(-15);
+  const sameModel = rows.length > 0;
+  if (!rows.length) rows = all.slice(-15);
+  const pcts = rows.map((r) => r.pct5h).filter((x) => typeof x === 'number' && x >= 0);
+  return {
+    n: rows.length, sameModel,
+    tokMed: median(rows.map((r) => r.tokens)), tokHigh: pct80(rows.map((r) => r.tokens)),
+    pctN: pcts.length, pctMed: median(pcts), pctHigh: pct80(pcts),
+    costMed: median(rows.map((r) => r.cost || 0))
+  };
+}
+
 // ---------- claude.exe bulma ----------
 // Masaüstü uygulamasının imzalı claude.exe'si: %APPDATA%\Claude\claude-code\<sürüm>\<hash>\claude.exe
 function cmpVer(a, b) {
@@ -272,6 +325,31 @@ class AgentSession {
     } catch { return null; }
   }
 
+
+  // İş bitince: toplam token (alt ajanlar dahil) ve 5 saatlik limitten düşen yüzdeyi kaydet.
+  async recordTask(msg) {
+    const t = this.task; this.task = null;
+    if (!t) return;
+    try {
+      let tokens = 0, out = 0;
+      const mu = msg.modelUsage || {};
+      for (const k of Object.keys(mu)) {
+        const u = mu[k] || {};
+        out += u.outputTokens || 0;
+        tokens += (u.inputTokens || 0) + (u.outputTokens || 0) + (u.cacheCreationInputTokens || 0);
+      }
+      if (!tokens && msg.usage) { out = msg.usage.output_tokens || 0; tokens = (msg.usage.input_tokens || 0) + out + (msg.usage.cache_creation_input_tokens || 0); }
+      const u0 = await t.util0;
+      const u1 = await this.usage();
+      const a = u0 && u0.rate_limits && u0.rate_limits.five_hour && u0.rate_limits.five_hour.utilization;
+      const b = u1 && u1.rate_limits && u1.rate_limits.five_hour && u1.rate_limits.five_hour.utilization;
+      const rec = { ts: Date.now(), model: t.model, textLen: t.len, tokens, out, cost: msg.total_cost_usd || 0, turns: msg.num_turns || 0, ms: msg.duration_ms || 0,
+        pct5h: (typeof a === 'number' && typeof b === 'number') ? Math.round((b - a) * 10) / 10 : null };
+      fs.appendFileSync(statsFile(), JSON.stringify(rec) + '\n');
+      send('estimate:updated', true);
+    } catch (e) { console.error('İstatistik kaydedilemedi:', e.message); }
+  }
+
   async setModel(model) {
     this.model = model;
     try { await this.q.setModel(model); } catch (e) { send('agent:error', 'Model değiştirilemedi: ' + e.message); }
@@ -284,7 +362,7 @@ class AgentSession {
           this.sessionId = msg.session_id;
           saveSettings({ sessionId: msg.session_id, sessionWs: this.ws });
         }
-        if (msg.type === 'result') { this.busy = false; send('agent:state', { state: 'bosta' }); }
+        if (msg.type === 'result') { this.busy = false; send('agent:state', { state: 'bosta' }); this.recordTask(msg); }
         logChat(this.ws, { kind: 'event', msg });
         send('agent:event', msg);
       }
@@ -299,6 +377,7 @@ class AgentSession {
 
   sendUser(text) {
     this.busy = true;
+    this.task = { model: this.model, len: text.length, util0: this.usage() };
     logChat(this.ws, { kind: 'user', text });
     send('agent:state', { state: 'calisiyor' });
     this.queue.push({
@@ -441,9 +520,28 @@ ipcMain.handle('agent:interrupt', () => session && session.interrupt());
 ipcMain.handle('agent:reset', () => {
   resetSession();
   const ws = loadSettings().workspace;
-  if (ws) clearChatLog(ws);
+  if (ws) { archiveCurrent(ws); clearChatLog(ws); }
   saveSettings({ sessionId: null, sessionWs: null });
 });
+ipcMain.handle('archive:list', () => listArchive(loadSettings().workspace));
+ipcMain.handle('archive:get', (_e, id) => {
+  try { const r = JSON.parse(fs.readFileSync(archiveFile(id), 'utf8')); return r.items; } catch { return []; }
+});
+ipcMain.handle('archive:restore', (_e, id) => {
+  try {
+    const r = JSON.parse(fs.readFileSync(archiveFile(id), 'utf8'));
+    const ws = loadSettings().workspace;
+    if (r.ws !== ws) return false;
+    resetSession();
+    archiveCurrent(ws); clearChatLog(ws);
+    for (const item of r.items) logChat(ws, item);
+    saveSettings({ sessionId: r.sessionId || null, sessionWs: r.sessionId ? ws : null });
+    fs.unlinkSync(archiveFile(id));
+    return true;
+  } catch { return false; }
+});
+ipcMain.handle('archive:delete', (_e, id) => { try { fs.unlinkSync(archiveFile(id)); } catch { /* yoksay */ } return true; });
+ipcMain.handle('estimate:get', (_e, model) => estimateFor(model || loadSettings().model || DEFAULT_MODEL));
 ipcMain.handle('chat:history', () => {
   const ws = loadSettings().workspace;
   return readChatLines().filter((l) => l.ws === ws).slice(-400).map((l) => l.item);

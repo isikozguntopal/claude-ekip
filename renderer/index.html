@@ -49,6 +49,7 @@
     </label>
     <span id="state" class="chip chip-off">Oturum yok</span>
     <button id="pvToggle" class="btn" title="Tarayıcı ve iOS Simulator önizlemesi">Önizleme</button>
+    <button id="histBtn" class="btn" title="Eski oturumlar">Geçmiş</button>
     <button id="newSession" class="btn">Yeni oturum</button>
   </header>
 
@@ -72,6 +73,7 @@
       <div id="slashMenu" class="slash hidden"></div>
       <div class="composer">
         <div id="leadHint" class="lead-hint"></div>
+        <div id="estimate" class="estimate"></div>
         <textarea id="input" rows="3" placeholder="Ekibe bir iş verin…  (Enter: gönder · Shift+Enter: yeni satır · / ile komutlar)"></textarea>
         <div class="composer-actions">
           <button id="stop" class="btn btn-danger" disabled>Durdur</button>
@@ -125,5 +127,6 @@
   <script src="shots.js"></script>
   <script src="office.js"></script>
   <script src="app.js"></script>
+<div id="hist" class="hist hidden"><div class="hist-box"><div class="hist-head"><b>Eski oturumlar</b><button id="histClose" class="btn">Kapat</button></div><div id="histList" class="hist-list"></div></div></div>
 </body>
 </html>
