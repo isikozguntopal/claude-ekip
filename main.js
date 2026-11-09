@@ -83,7 +83,20 @@ function readChatLines() {
     return fs.readFileSync(chatFile(), 'utf8').split('\n').filter(Boolean).map((l) => { try { return JSON.parse(l); } catch { return null; } }).filter(Boolean);
   } catch { return []; }
 }
+
+// Büyük araç çıktıları (ekran görüntüsü base64, dev dosya içerikleri) arayüzü çökertiyordu:
+// kayıt ve geri yükleme sırasında görüntü verisini at, uzun metni kısalt.
+function slim(v, depth = 0) {
+  if (typeof v === 'string') return v.length > 12000 ? v.slice(0, 12000) + `… [${v.length - 12000} karakter kısaltıldı]` : v;
+  if (!v || typeof v !== 'object' || depth > 12) return v;
+  if (Array.isArray(v)) return v.map((x) => slim(x, depth + 1));
+  if (v.type === 'image' && v.source) return { type: 'image', source: { type: 'omitted' } };
+  const o = {};
+  for (const k of Object.keys(v)) o[k] = slim(v[k], depth + 1);
+  return o;
+}
 function logChat(ws, item) {
+  item = slim(item);
   try { fs.appendFileSync(chatFile(), JSON.stringify({ ws, item }) + '\n'); } catch (e) { console.error('Sohbet kaydedilemedi:', e.message); }
 }
 function clearChatLog(ws) {
@@ -244,7 +257,7 @@ let sdkPromise = null;
 const loadSdk = () => (sdkPromise ||= import('@anthropic-ai/claude-agent-sdk'));
 
 function send(channel, payload) {
-  if (win && !win.isDestroyed()) win.webContents.send(channel, payload);
+  try { if (win && !win.isDestroyed() && !win.webContents.isCrashed()) win.webContents.send(channel, payload); } catch { /* arayüz yeniden yükleniyor */ }
 }
 
 class InputQueue {
@@ -544,7 +557,7 @@ ipcMain.handle('archive:delete', (_e, id) => { try { fs.unlinkSync(archiveFile(i
 ipcMain.handle('estimate:get', (_e, model) => estimateFor(model || loadSettings().model || DEFAULT_MODEL));
 ipcMain.handle('chat:history', () => {
   const ws = loadSettings().workspace;
-  return readChatLines().filter((l) => l.ws === ws).slice(-400).map((l) => l.item);
+  return readChatLines().filter((l) => l.ws === ws).slice(-400).map((l) => slim(l.item));
 });
 ipcMain.handle('agent:mode', (_e, mode) => {
   saveSettings({ permissionMode: mode });
@@ -813,6 +826,10 @@ function createWindow() {
     }
   });
   win.loadFile(path.join(__dirname, 'renderer', 'index.html'));
+  win.webContents.on('render-process-gone', (_e, d) => {   // arayüz çökerse boş ekranda kalma: yeniden yükle
+    console.error('Arayüz çöktü:', d && d.reason);
+    setTimeout(() => { try { win.webContents.reload(); } catch { /* yoksay */ } }, 500);
+  });
   win.webContents.setWindowOpenHandler(({ url }) => {
     if (/^https:\/\/github\.com\//.test(url)) shell.openExternal(url);
     return { action: 'deny' };
