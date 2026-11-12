@@ -42,3 +42,11 @@ npm start          # geliştirme
   Mac'te paket gerekiyorsa `electron-builder` ya da `@electron/packager` ile bir `.app` üretilebilir; şimdilik
   `npm start` yeterli.
 - `dist/` (paketlenmiş Windows exe) depoya konmaz.
+
+## Takım modu (yeni)
+
+Tasarım ve varsayımlar: `docs/takim-modu.md`. Dosyalar: `team-mode.js` (Supabase auth/DB/realtime, presence, gh repo özeti, görev kuyruğu),
+`conflict.js` (çakışma tespiti, saf mantık; `node scripts/conflict-test.js` gerçek Haiku ile dener), `renderer/team.js` (Takım paneli),
+`supabase/schema.sql` (tablolar + RLS), `site/join.html` (davet sayfası; GitHub Pages ile yayınlanabilir).
+Sunucuya yalnızca metadata gider; sohbet/prompt/yanıt yerel kalır. Kurulum: Supabase projesi aç → schema.sql'i çalıştır → GitHub/Google'ı etkinleştir →
+Redirect URL `http://127.0.0.1:54821/cb` ekle → uygulamada Takım › URL + anon key.

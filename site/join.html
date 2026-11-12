@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="tr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Claude Ekibim · Takıma katıl</title>
+<style>
+ body{font:16px/1.5 system-ui,sans-serif;background:#17141f;color:#ece6f6;margin:0;display:flex;justify-content:center;padding:40px 16px}
+ main{max-width:520px;width:100%} h1{font-size:22px} .card{background:#221d2e;border:1px solid #3d3452;border-radius:10px;padding:16px;margin:14px 0}
+ a.btn,button{display:inline-block;background:#d97757;color:#fff;border:0;border-radius:8px;padding:10px 16px;font:inherit;text-decoration:none;cursor:pointer;margin:4px 6px 4px 0}
+ a.alt{background:#2b2539;border:1px solid #51466b} code{background:#17141f;padding:3px 8px;border-radius:6px;word-break:break-all} small{color:#a49bb8}
+</style></head><body><main>
+<h1>Claude Ekibim takımına davetlisin</h1>
+<div class="card"><b>1 · Uygulamayı indir</b><p id="os"></p>
+ <a id="dl" class="btn" href="https://github.com/isikozguntopal/claude-ekip/releases/latest">İndirme sayfası</a>
+ <small>Hazır paket yoksa depodan çalıştırılır: <code>git clone https://github.com/isikozguntopal/claude-ekip &amp;&amp; cd claude-ekip &amp;&amp; npm install &amp;&amp; npm start</code></small></div>
+<div class="card"><b>2 · Takıma katıl</b><p>Uygulama kuruluysa:</p>
+ <a id="open" class="btn" href="#">Uygulamada aç</a>
+ <p><small>Açılmazsa uygulamada <b>Takım</b> düğmesine basıp bu kodu yapıştır:</small><br><code id="code">—</code> <button id="copy" class="alt">Kopyala</button></p></div>
+<div class="card"><small>Herkes kendi Claude hesabıyla çalışır; hesap veya oturum paylaşılmaz. Takıma yalnızca durum, repo özeti, görev ve karar bilgileri gider; sohbetlerin bilgisayarında kalır.</small></div>
+<script>
+ var code=(new URLSearchParams(location.search).get('code')||'').replace(/[^0-9a-fA-F]/g,'');
+ document.getElementById('code').textContent=code||'(davet kodu yok)';
+ document.getElementById('open').href='claude-ekibim://join?code='+code;
+ var ua=navigator.userAgent, os=/Mac/.test(ua)?'macOS':/Windows/.test(ua)?'Windows':'bilgisayarın';
+ document.getElementById('os').textContent=os+' için kurulum yönlendirmesi: indirme sayfasından uygun paketi seç.';
+ document.getElementById('copy').onclick=function(){navigator.clipboard.writeText(code)};
+</script></main></body></html>

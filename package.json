@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "0.3.204",
+    "@supabase/supabase-js": "^2.119.0",
     "zod": "^4.0.0"
   },
   "devDependencies": {

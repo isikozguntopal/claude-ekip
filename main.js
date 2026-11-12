@@ -708,6 +708,27 @@ ipcMain.handle('task:summarize', async (_e, text) => {
   } catch { return null; } finally { clearTimeout(timer); }
 });
 
+
+// ---------- Takım modu ----------
+// Küçük model tek-tur çağrısı (çakışma denetimi); araçsız, oturum kaydetmez.
+async function oneShot(system, prompt) {
+  const abort = new AbortController();
+  const timer = setTimeout(() => abort.abort(), 60000);
+  try {
+    const exe = findClaudeExe();
+    if (!exe) throw new Error('claude bulunamadı');
+    const { query } = await loadSdk();
+    let out = '';
+    for await (const msg of query({ prompt, options: { cwd: os.tmpdir(), pathToClaudeCodeExecutable: exe, model: 'claude-haiku-5-5', systemPrompt: system, env: childEnv(), settingSources: [], tools: [], maxTurns: 1, persistSession: false, abortController: abort } })) {
+      if (msg.type === 'assistant') for (const b of (msg.message && msg.message.content) || []) if (b.type === 'text') out += b.text;
+    }
+    return out;
+  } finally { clearTimeout(timer); }
+}
+const teamMode = require('./team-mode').init({ app, ipcMain, shell, send, loadSdk, findClaudeExe, childEnv, oneShot, loadSettings });
+try { app.setAsDefaultProtocolClient('claude-ekibim'); } catch { /* geliştirme ortamında kayıt olmayabilir */ }
+app.on('open-url', (e, url) => { e.preventDefault(); teamMode.handleJoinUrl(url); });
+
 // ---------- Sürükle bırak ekran resmi ----------
 // Bırakılan resimler "ekran resmi N" adıyla kopyalanır; N uygulama genelinde artar.
 const shotDir = () => path.join(app.getPath('userData'), 'ekran-resimleri');
