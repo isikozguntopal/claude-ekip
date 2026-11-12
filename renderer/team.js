@@ -25,16 +25,18 @@
 
   // ---------- Bölümler ----------
   function setupView() {
-    return `<div class="tm-card"><h3>1 · Sunucu bağlantısı</h3>
-      <p class="tm-muted">Takımın Supabase projesi (supabase/schema.sql çalıştırılmış olmalı). Bu iki değer paylaşılabilir; korumayı sunucudaki RLS sağlar.</p>
-      <input id="tmUrl" class="tm-in" placeholder="https://xxxx.supabase.co" value="${esc(T.snap.url)}">
-      <input id="tmKey" class="tm-in" placeholder="anon (public) key">
-      <button class="btn" data-act="saveCfg">Kaydet</button>
-      <p class="tm-muted">Supabase › Authentication › URL Configuration › Redirect URLs listesine <code>http://127.0.0.1:54821/cb</code> ekleyin.</p></div>`;
+    return `<div class="tm-card"><h3>1 · Sunucu bağlantısı (Firebase)</h3>
+      <p class="tm-muted">Takımın Firebase projesi: Authentication'da E-posta/Şifre açık, Firestore oluşturulmuş ve <code>firebase/firestore.rules</code> yayınlanmış olmalı. Bu iki değer paylaşılabilir; korumayı sunucudaki kurallar sağlar.</p>
+      <input id="tmProj" class="tm-in" placeholder="Project ID (ör. claude-ekibim-ab12c)" value="${esc(T.snap.projectId)}">
+      <input id="tmKey" class="tm-in" placeholder="Web API Key (AIza…)">
+      <button class="btn" data-act="saveCfg">Kaydet</button></div>`;
   }
   function loginView() {
-    return `<div class="tm-card"><h3>2 · Giriş</h3><p class="tm-muted">Her üye kendi hesabıyla girer. Claude hesabı/oturumu paylaşılmaz.</p>
-      <button class="btn" data-act="login" data-p="github">GitHub ile gir</button> <button class="btn" data-act="login" data-p="google">Google ile gir</button>
+    return `<div class="tm-card"><h3>2 · Giriş / kayıt</h3><p class="tm-muted">Her üye kendi e-postasıyla kayıt olur. Claude hesabı/oturumu paylaşılmaz.</p>
+      <input id="tmUser" class="tm-in" placeholder="Adın (yalnızca kayıtta)">
+      <input id="tmMail" class="tm-in" type="email" placeholder="E-posta">
+      <input id="tmPass" class="tm-in" type="password" placeholder="Şifre (en az 6 karakter)">
+      <button class="btn" data-act="login" data-p="in">Giriş yap</button> <button class="btn" data-act="login" data-p="up">Kayıt ol</button>
       <button class="btn" data-act="cfg">Bağlantıyı değiştir</button></div>`;
   }
   function noTeamView() {
@@ -163,9 +165,9 @@
     const b = e.target.closest('[data-act]'); if (!b) return;
     const d = b.dataset;
     switch (d.act) {
-      case 'saveCfg': return act(async () => { await call('config', { url: val('tmUrl'), anonKey: val('tmKey') || (T.snap.url ? '' : '') }); T.editCfg = false; }, 'Kaydedildi');
+      case 'saveCfg': return act(async () => { await call('config', { projectId: val('tmProj'), apiKey: val('tmKey') }); T.editCfg = false; }, 'Kaydedildi');
       case 'cfg': T.editCfg = true; return render();
-      case 'login': return act(() => call('signIn', d.p), 'Giriş yapıldı');
+      case 'login': return act(() => call('signIn', { email: val('tmMail'), password: val('tmPass'), name: val('tmUser'), signUp: d.p === 'up' }), d.p === 'up' ? 'Kayıt tamamlandı' : 'Giriş yapıldı');
       case 'logout': return act(() => call('signOut'));
       case 'create': return act(() => call('create', { name: val('tmName') || 'Takımım' }), 'Takım kuruldu');
       case 'join': return act(() => call('join', { code: val('tmCode') }), 'Takıma katıldın');
@@ -218,6 +220,7 @@
     window.ekip.onTeamChanged(() => { if (!$('#team').classList.contains('hidden') && !T.busy) { const f = document.activeElement; if (!(f && f.closest && f.closest('#teamBody') && /INPUT|TEXTAREA/.test(f.tagName))) refresh(); } });
     window.ekip.onTeamIncoming((t) => { say(`Yeni görev isteği: ${t.title}`); const b = $('#teamBtn'); b.classList.add('ping'); });
     window.ekip.onTeamJoinLink((code) => { T.joinCode = code; open(); });
+    setInterval(() => { if (!$('#team').classList.contains('hidden') && !T.busy) { const f = document.activeElement; if (!(f && f.closest && f.closest('#teamBody') && /INPUT|TEXTAREA|SELECT/.test(f.tagName))) refresh(); } }, 20000);   // sunucudan canlı dinleme yok: panel açıkken yokla
     // Takım modu açıksa uygulama açılışında sessizce bağlan (heartbeat/realtime başlasın)
     window.ekip.team('snapshot').then((r) => { if (r.ok && r.data.team) T.snap = r.data; });
   }

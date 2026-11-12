@@ -1,0 +1,39 @@
+rules_version = '2';
+// Claude Ekibim · Takım modu güvenlik kuralları. Firebase > Firestore > Rules'a yapıştırıp Publish edin.
+// Sunucuda yalnızca metadata tutulur; yalnızca takım üyeleri okur/yazar.
+service cloud.firestore {
+  match /databases/{db}/documents {
+
+    function signedIn() { return request.auth != null; }
+    function isMember(t) { return signedIn() && exists(/databases/$(db)/documents/teams/$(t)/members/$(request.auth.uid)); }
+
+    // Her kullanıcı yalnızca kendi "hangi takımdayım" kaydını okur/yazar
+    match /users/{uid} { allow read, write: if signedIn() && request.auth.uid == uid; }
+
+    match /teams/{t} {
+      // Takım belgesi (davet kodu içerir): yalnızca üye ya da kurucu okur
+      allow read: if isMember(t) || (signedIn() && resource.data.createdBy == request.auth.uid);
+      allow create: if signedIn() && request.resource.data.createdBy == request.auth.uid;
+      allow update: if signedIn() && resource.data.createdBy == request.auth.uid;
+
+      match /members/{uid} {
+        allow read: if isMember(t);
+        // Katılım: davet kodunu bilen ya da kurucu, yalnızca kendi adına
+        allow create: if signedIn() && request.auth.uid == uid
+          && (request.resource.data.code == get(/databases/$(db)/documents/teams/$(t)).data.inviteCode
+              || get(/databases/$(db)/documents/teams/$(t)).data.createdBy == request.auth.uid);
+        allow update, delete: if signedIn() && request.auth.uid == uid;
+      }
+      match /team_repos/{r}   { allow read, write: if isMember(t); }
+      match /member_repos/{r} { allow read: if isMember(t); allow write: if isMember(t) && r.matches(request.auth.uid + '__.*'); }
+      match /tasks/{id} {
+        allow read: if isMember(t);
+        allow create: if isMember(t) && request.resource.data.from_user == request.auth.uid;
+        allow update: if isMember(t) && (resource.data.to_user == request.auth.uid || resource.data.from_user == request.auth.uid);
+      }
+      match /topics/{id}    { allow read, write: if isMember(t); }
+      match /decisions/{id} { allow read, write: if isMember(t); }
+      match /notes/{id}     { allow read, write: if isMember(t); }
+    }
+  }
+}

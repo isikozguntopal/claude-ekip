@@ -1,16 +1,25 @@
 # Takım modu — tasarım
 
-Mevcut Claude Ekibim uygulamasının genişletilmesi. Yeni uygulama yok; yeni dosyalar: `team-mode.js` (ana süreç), `conflict.js` (çakışma tespiti), `renderer/team.js` (arayüz), `supabase/schema.sql`, `site/join.html`.
+Mevcut Claude Ekibim uygulamasının genişletilmesi. Yeni uygulama yok; yeni dosyalar: `team-mode.js` (ana süreç), `conflict.js` (çakışma tespiti), `renderer/team.js` (arayüz), `firebase/firestore.rules`, `site/join.html`.
 
 ## Varsayımlar (soru sormadan ilerlendi)
-1. **Sunucu: Supabase.** Auth (GitHub/Google OAuth), Postgres + RLS, Realtime. Gerekçe: üç kişilik takım için kendi sunucu yazmadan auth + güvenli satır erişimi (RLS) + gerçek zamanlı bildirim tek yerde; ücretsiz katman yeter. Hesabı ve projeyi **kullanıcı açar**; uygulama `URL` ve `anon key` ister (anon key gizli değildir, koruma RLS'tedir).
-2. **Giriş:** sistem tarayıcısı + `127.0.0.1` geri dönüş adresi + PKCE (geliştirme ortamında özel protokol kaydı gerekmesin diye).
-3. **Davet linki:** takımın `invite_code`'u. Link `site/join.html?code=…` (GitHub Pages ile yayınlanır): işletim sistemini algılar, indirme sayfasına yönlendirir, "Uygulamada aç" `claude-ekibim://join?code=…` çağırır. Uygulamaya kod/link elle de yapıştırılabilir.
+1. **Sunucu: Firebase (Spark, ücretsiz, kart yok).** Auth (e-posta/şifre) + Firestore + güvenlik kuralları. Supabase ücretsiz proje limiti dolu olduğu için seçildi. Uygulama Firebase SDK'sı yerine **REST** kullanır (ana süreçte oturum saklama sorunu ve bağımlılık yok). Canlı dinleme yok: heartbeat 30 sn, gelen görev yoklaması 60 sn, panel açıkken 20 sn'de bir yenileme. Hesabı ve projeyi **kullanıcı açar**; uygulama `Project ID` ve `Web API Key` ister (gizli değildir, koruma kurallardadır).
+2. **Giriş:** e-posta/şifre (GitHub/Google girişi sonraya; ek OAuth istemcisi kurulumu gerektirir).
+3. **Davet linki:** takım kimliği + gizli kod (`teamId + inviteCode`). Link `site/join.html?code=…` (GitHub Pages ile yayınlanır): işletim sistemini algılar, indirme sayfasına yönlendirir, "Uygulamada aç" `claude-ekibim://join?code=…` çağırır. Uygulamaya kod/link elle de yapıştırılabilir.
 4. **Gizlilik:** sunucuya yalnızca metadata gider (üye, durum, konu, repo özeti, görev başlığı/açıklaması, karar). Sohbet, prompt ve yanıt metinleri sunucuya **yazılmaz**. Çakışma kontrolü **kendi bilgisayarında** çalışır: paylaşılan kayıtlar indirilir, karşılaştırma yerel Haiku çağrısıyla yapılır.
 5. **Hesap yok:** Claude kimlik bilgisi/oturumu paylaşılmaz. Görev, alıcının makinesinde alıcının kendi Claude hesabıyla çalışır.
 6. **Repo verisi:** her üyenin kendi `gh` CLI'ı özet çıkarır (branch, açık PR, son commit) ve `member_repos`'a yazar; kişiler arası dosya paylaşımı yok. Yerel klon yolu yalnızca yerel `team-local.json`'da.
 
-## Veri modeli (`supabase/schema.sql`)
+## Veri modeli (Firestore)
+```
+users/{uid}                      → { teamId }
+teams/{t}                        → { name, inviteCode, createdBy }
+  members/{uid}                  → presence: last_seen, topic, active_repo/branch, role, code
+  team_repos/{repo} · member_repos/{uid__repo} (installed, branch, commit, açık PR'lar)
+  tasks/{id}                     → from→to, repo, status, conflict, result, topic_id
+  topics/{id}                    → mevcut durum, iki istek, neden, options[], votes{uid:optionId}, comments[]
+  decisions/{id}                 → statement, area, repo, topic_id, task_id, active
+  notes/{id}                     → toplantı notu / transkript
 ```
 teams ─< members (presence: last_seen, topic, active_repo/branch)
 teams ─< team_repos ─< member_repos (üye başına: installed, branch, commit, açık PR'lar)
@@ -37,5 +46,5 @@ yeni istek (görev isteği | özellik/değişiklik | yerel prompt*)
 \* Yerel promptlar sunucuya gitmez; kontrol yalnızca "Takım modu" açıkken ve ayar etkinse yapılır.
 
 ## İlk sürüm kapsamı
-**Var:** şema+RLS, auth (GitHub/Google), takım kur/katıl, davet sayfası, üye listesi + presence + konu, repo bağlama + `gh` özeti, görev isteği (kuyruk → onay → alıcıda çalışma → sonuç bildirimi), çakışma tespiti (none/minor/major), Tartışma sekmesi (konu, seçenek, oy, yorum, karar), notlar.
+**Var:** Firestore kuralları, e-posta girişi, takım kur/katıl, davet sayfası, üye listesi + presence + konu, repo bağlama + `gh` özeti, görev isteği (kuyruk → onay → alıcıda çalışma → sonuç bildirimi), çakışma tespiti (none/minor/major), Tartışma sekmesi (konu, seçenek, oy, yorum, karar), notlar.
 **Sonraya:** Windows/macOS kurulum paketleri ve imzalı sürümler (indirme bağlantıları yer tutucu), özel protokolün paketlenmiş uygulamada kaydı, otomatik repo klonlama (yalnızca `gh repo clone` komutu önerilir), toplantı transkriptinin otomatik içe aktarımı, yerel promptların sürekli kontrolü, bildirim (OS bildirimi), karar geçmişi aramaları.
