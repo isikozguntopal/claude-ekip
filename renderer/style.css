@@ -355,3 +355,5 @@ main.pv-open .preview { display: flex; }
 .hist-item .m { font: 11px var(--mono); color: var(--faint); margin: 3px 0 6px; }
 .hist-item .a { display: flex; gap: 6px; }
 .hist-empty { color: var(--muted); padding: 16px; text-align: center; }
+
+#ecoBtn.on { background: #1f4d36; border-color: var(--ok); color: var(--ok); }

@@ -581,6 +581,7 @@ function updateLeadHint() {
 function summarizeTask(text) {
   if (!window.Office) return;
   Office.setTask(text);
+  if (S.eco) return;   // eko modda ekstra model çağrısı yapma
   window.ekip.summarizeTask(text).then((s) => {
     if (!s) return;
     Office.setTask(s, true);
@@ -644,6 +645,12 @@ async function renderEstimate() {
   }
   el.className = cls;
   el.textContent = txt;
+}
+
+function paintEco() {
+  $('#ecoBtn').classList.toggle('on', !!S.eco);
+  $('#ecoBtn').textContent = S.eco ? 'Eko ✓' : 'Eko';
+  $('#model').disabled = !!S.eco;
 }
 
 // ---------- Eski oturumlar ----------
@@ -914,6 +921,8 @@ async function boot() {
   $('#mode').value = S.mode;
   S.model = info.settings.model;
   $('#model').value = S.model;
+  S.eco = !!info.settings.eco;
+  paintEco();
   $('#model').addEventListener('change', async (e) => {
     S.model = e.target.value;
     await window.ekip.setModel(S.model);
@@ -964,6 +973,13 @@ async function boot() {
   const inp = $('#input');
   inp.addEventListener('input', () => { showSlash(); updateLeadHint(); clearTimeout(estTimer); estTimer = setTimeout(renderEstimate, 400); });
   $('#histBtn').addEventListener('click', openHistory);
+  $('#ecoBtn').addEventListener('click', async () => {
+    S.eco = !S.eco;
+    await window.ekip.setEco(S.eco);
+    paintEco();
+    renderEstimate();
+    toast(S.eco ? 'Eko mod AÇIK: Haiku, kısa talimat, alt ajan ve plugin yok. Küçük sorular için.' : 'Eko mod kapalı: tam ekip ve seçili model.');
+  });
   $('#histClose').addEventListener('click', () => $('#hist').classList.add('hidden'));
   $('#hist').addEventListener('click', (e) => { if (e.target.id === 'hist') $('#hist').classList.add('hidden'); });
   window.ekip.onEstimate(() => { refreshLimits().then(renderEstimate); });

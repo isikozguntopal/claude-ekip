@@ -283,7 +283,8 @@ class InputQueue {
 }
 
 class AgentSession {
-  constructor(ws, mode, model, resume) {
+  constructor(ws, mode, model, resume, eco) {
+    this.eco = !!eco;
     this.ws = ws;
     this.resume = resume;
     this.mode = mode;
@@ -303,26 +304,35 @@ class AgentSession {
     if (!exe) throw new Error('claude.exe bulunamadı. Ayarlardan yolunu seçin.');
     const { query } = await loadSdk();
     const previewMcp = await previewServer();
-    this.q = query({
-      prompt: this.queue,
-      options: {
-        cwd: this.ws,
-        pathToClaudeCodeExecutable: exe,
-        settingSources: ['user', 'project', 'local'],
-        model: this.model,
-        resume: this.resume || undefined,
-        permissionMode: this.mode,
-        allowDangerouslySkipPermissions: this.mode === 'bypassPermissions',
-        includeHookEvents: true,
-        systemPrompt: { type: 'preset', preset: 'claude_code', append: LEAD_PERSONA },
-        agents: TEAM_AGENTS,
-        mcpServers: { 'ekip-preview': previewMcp },
-        abortController: this.abort,
-        env: childEnv(),
-        canUseTool: (toolName, input, opts) => this.askPermission(toolName, input, opts),
-        stderr: (d) => send('agent:stderr', String(d))
-      }
+    const common = {
+      cwd: this.ws,
+      pathToClaudeCodeExecutable: exe,
+      model: this.model,
+      resume: this.resume || undefined,
+      permissionMode: this.mode,
+      allowDangerouslySkipPermissions: this.mode === 'bypassPermissions',
+      abortController: this.abort,
+      env: childEnv(),
+      canUseTool: (toolName, input, opts) => this.askPermission(toolName, input, opts),
+      stderr: (d) => send('agent:stderr', String(d))
+    };
+    // Eko mod: küçük model, kısa sistem talimatı, kullanıcı plugin/skill/hook yüklemesi yok,
+    // alt ajan ve önizleme MCP araçları yok, düşünme kapalı, tur sınırı düşük.
+    const options = this.eco ? Object.assign(common, {
+      settingSources: ['project'],
+      systemPrompt: ECO_PERSONA,
+      tools: ['Read', 'Grep', 'Glob', 'Edit', 'Write', 'Bash'],
+      thinking: { type: 'disabled' },
+      effort: 'low',
+      maxTurns: 10
+    }) : Object.assign(common, {
+      settingSources: ['user', 'project', 'local'],
+      includeHookEvents: true,
+      systemPrompt: { type: 'preset', preset: 'claude_code', append: LEAD_PERSONA },
+      agents: TEAM_AGENTS,
+      mcpServers: { 'ekip-preview': previewMcp }
     });
+    this.q = query({ prompt: this.queue, options });
     send('agent:state', { state: 'bosta', ws: this.ws, exe });
     this.pump();
   }
@@ -498,6 +508,8 @@ ipcMain.handle('team:install', async (_e, memberId) => {
   return Object.assign(r, { status: teamStatus(ws) });
 });
 
+const ECO_MODEL = 'claude-haiku-5-5';
+const ECO_PERSONA = 'Kullanıcıya "Patron" diye hitap et, Türkçe ve çok kısa yanıt ver. Soruyu doğrudan yanıtla; gerekmedikçe araç çağırma, dosya okuma ve uzun açıklama yapma. Büyük bir iş istenirse yapmadan önce kısaca ne yapacağını söyle ve onay iste.';
 const DEFAULT_MODEL = 'claude-sonnet-5-5'; // fiyat/performans
 
 let starting = null;
@@ -508,7 +520,7 @@ async function ensureSession() {
   if (!s.workspace) throw new Error('Önce bir workspace seçin.');
   // Önceki sohbet aynı workspace'teyse Claude'un oturumunu devam ettir.
   const resume = s.sessionWs === s.workspace ? s.sessionId : undefined;
-  const sess = new AgentSession(s.workspace, s.permissionMode || 'default', s.model || DEFAULT_MODEL, resume);
+  const sess = new AgentSession(s.workspace, s.permissionMode || 'default', s.eco ? ECO_MODEL : (s.model || DEFAULT_MODEL), resume, s.eco);
   starting = sess.start().then(() => { session = sess; return sess; }).finally(() => { starting = null; });
   return starting;
 }
@@ -517,6 +529,11 @@ ipcMain.handle('agent:send', async (_e, { text }) => {
   const sess = await ensureSession();
   sess.sendUser(text);
   return true;
+});
+ipcMain.handle('agent:eco', (_e, on) => {
+  saveSettings({ eco: !!on });
+  resetSession();   // seçenekler oturum başlarken belirlenir; sohbet ve Claude bağlamı korunur (resume)
+  return !!on;
 });
 ipcMain.handle('agent:model', (_e, model) => {
   saveSettings({ model });
@@ -554,7 +571,7 @@ ipcMain.handle('archive:restore', (_e, id) => {
   } catch { return false; }
 });
 ipcMain.handle('archive:delete', (_e, id) => { try { fs.unlinkSync(archiveFile(id)); } catch { /* yoksay */ } return true; });
-ipcMain.handle('estimate:get', (_e, model) => estimateFor(model || loadSettings().model || DEFAULT_MODEL));
+ipcMain.handle('estimate:get', (_e, model) => estimateFor(loadSettings().eco ? ECO_MODEL : (model || loadSettings().model || DEFAULT_MODEL)));
 ipcMain.handle('chat:history', () => {
   const ws = loadSettings().workspace;
   return readChatLines().filter((l) => l.ws === ws).slice(-400).map((l) => slim(l.item));

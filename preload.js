@@ -14,6 +14,7 @@ contextBridge.exposeInMainWorld('ekip', {
   teamStatus: () => ipcRenderer.invoke('team:status'),
   install: (memberId) => ipcRenderer.invoke('team:install', memberId),
   send: (text) => ipcRenderer.invoke('agent:send', { text }),
+  setEco: (on) => ipcRenderer.invoke('agent:eco', on),
   setModel: (model) => ipcRenderer.invoke('agent:model', model),
   usage: () => ipcRenderer.invoke('usage:get'),
   authStatus: () => ipcRenderer.invoke('auth:status'),
