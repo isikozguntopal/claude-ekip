@@ -167,7 +167,7 @@
     const b = e.target.closest('[data-act]'); if (!b) return;
     const d = b.dataset;
     switch (d.act) {
-      case 'saveCfg': if (!val('tmProj') || (!val('tmKey') && !T.snap.configured)) return say('Project ID ve Web API Key kutularını doldurun.', 'err'); return act(async () => { await call('config', { projectId: val('tmProj'), apiKey: val('tmKey') }); T.editCfg = false; }, 'Kaydedildi');
+      case 'saveCfg': if (!val('tmProj') || (!val('tmKey') && !T.snap.configured)) return say('Project ID ve Web API Key kutularını doldurun.', 'err'); return act(async () => { await call('config', { projectId: val('tmProj'), apiKey: val('tmKey') }); T.editCfg = false; T.snap = Object.assign({}, T.snap, { configured: true, signedIn: false }); }, 'Kaydedildi');
       case 'cfg': T.editCfg = true; return render();
       case 'login': return act(() => call('signIn', { email: val('tmMail'), password: val('tmPass'), name: val('tmUser'), signUp: d.p === 'up' }), d.p === 'up' ? 'Kayıt tamamlandı' : 'Giriş yapıldı');
       case 'logout': return act(() => call('signOut'));

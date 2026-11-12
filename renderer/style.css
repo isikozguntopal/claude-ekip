@@ -375,3 +375,5 @@ main.pv-open .preview { display: flex; }
 .tm-opt { border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; margin: 6px 0; } .tm-opt.mine { border-color: var(--ok); }
 .tm-cm { font-size: 12px; margin: 4px 0; } .tm-copy { margin: 4px 0; word-break: break-all; } .tm-copy code, .tm-card code { background: var(--bg); padding: 2px 5px; border-radius: 4px; }
 #teamBtn.ping { box-shadow: 0 0 0 2px var(--accent); }
+
+.toasts { z-index: 200 !important; }   /* takım/geçmiş panelinin üstünde görünsün */
