@@ -137,7 +137,8 @@
 
   function render() {
     const box = $('#teamBody'); if (!box) return;
-    const keep = { y: box.scrollTop };
+    const keep = { y: box.scrollTop, v: {} };
+    box.querySelectorAll('input,textarea,select').forEach((e) => { if (e.id) keep.v[e.id] = e.value; });   // yenileme yazılanları silmesin
     const s = T.snap;
     let html = '';
     if (!s) html = '<div class="tm-muted">yükleniyor…</div>';
@@ -153,6 +154,7 @@
     }
     if (T.err && s && !s.signedIn) html = `<div class="tm-card tm-major">${esc(T.err)}</div>` + html;
     box.innerHTML = html;
+    for (const id of Object.keys(keep.v)) { const e = box.querySelector('#' + id); if (e && !e.value && keep.v[id]) e.value = keep.v[id]; }
     box.scrollTop = keep.y;
   }
 
@@ -165,7 +167,7 @@
     const b = e.target.closest('[data-act]'); if (!b) return;
     const d = b.dataset;
     switch (d.act) {
-      case 'saveCfg': return act(async () => { await call('config', { projectId: val('tmProj'), apiKey: val('tmKey') }); T.editCfg = false; }, 'Kaydedildi');
+      case 'saveCfg': if (!val('tmProj') || (!val('tmKey') && !T.snap.configured)) return say('Project ID ve Web API Key kutularını doldurun.', 'err'); return act(async () => { await call('config', { projectId: val('tmProj'), apiKey: val('tmKey') }); T.editCfg = false; }, 'Kaydedildi');
       case 'cfg': T.editCfg = true; return render();
       case 'login': return act(() => call('signIn', { email: val('tmMail'), password: val('tmPass'), name: val('tmUser'), signUp: d.p === 'up' }), d.p === 'up' ? 'Kayıt tamamlandı' : 'Giriş yapıldı');
       case 'logout': return act(() => call('signOut'));
@@ -220,7 +222,7 @@
     window.ekip.onTeamChanged(() => { if (!$('#team').classList.contains('hidden') && !T.busy) { const f = document.activeElement; if (!(f && f.closest && f.closest('#teamBody') && /INPUT|TEXTAREA/.test(f.tagName))) refresh(); } });
     window.ekip.onTeamIncoming((t) => { say(`Yeni görev isteği: ${t.title}`); const b = $('#teamBtn'); b.classList.add('ping'); });
     window.ekip.onTeamJoinLink((code) => { T.joinCode = code; open(); });
-    setInterval(() => { if (!$('#team').classList.contains('hidden') && !T.busy) { const f = document.activeElement; if (!(f && f.closest && f.closest('#teamBody') && /INPUT|TEXTAREA|SELECT/.test(f.tagName))) refresh(); } }, 20000);   // sunucudan canlı dinleme yok: panel açıkken yokla
+    setInterval(() => { if (T.snap && T.snap.team && !$('#team').classList.contains('hidden') && !T.busy) { const f = document.activeElement; if (!(f && f.closest && f.closest('#teamBody') && /INPUT|TEXTAREA|SELECT/.test(f.tagName))) refresh(); } }, 20000);   // sunucudan canlı dinleme yok: panel açıkken yokla
     // Takım modu açıksa uygulama açılışında sessizce bağlan (heartbeat/realtime başlasın)
     window.ekip.team('snapshot').then((r) => { if (r.ok && r.data.team) T.snap = r.data; });
   }
